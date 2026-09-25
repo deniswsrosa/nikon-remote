@@ -17,6 +17,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import catalog
+from .assist import Assist
+from .audio import AudioMonitor, list_sources
 from .camera import CameraService, UserError
 from .ptp import PTPError
 from .ptp_names import PTP_PROP_NAMES
@@ -38,6 +40,13 @@ ALLOWED_COMMANDS = {
     "save_preset",
     "delete_preset",
     "apply_preset",
+    "restart_lv",
+}
+ASSIST_COMMANDS = {
+    "face_focus": "focus_eyes",
+    "face_expose": "expose_for_face",
+    "face_remember": "remember_brightness",
+    "assist_config": "set_config",
 }
 
 
@@ -70,9 +79,18 @@ class Hub:
             c.outbox.put_nowait(msg)
 
 
-def create_app(service: CameraService) -> FastAPI:
+def create_app(service: CameraService, assist: Assist | None = None, audio: AudioMonitor | None = None) -> FastAPI:
     app = FastAPI(title="Nikon Remote")
     hub = Hub(service)
+    latest = {"face": None, "audio": None, "session": None}
+    if audio is not None:
+        audio._emit = service._emit  # audio levels go out through the same hub
+
+    def remember(kind, payload):
+        if kind in latest:
+            latest[kind] = payload
+
+    service.add_listener(remember)
 
     @app.on_event("startup")
     async def _startup():
@@ -110,6 +128,10 @@ def create_app(service: CameraService) -> FastAPI:
                         "names": {str(k): v for k, v in PTP_PROP_NAMES.items()},
                         "props": snap["props"],
                         "status": snap["status"],
+                        "face": latest["face"],
+                        "audio": latest["audio"],
+                        "session": latest["session"],
+                        "assist": assist.cfg if assist else None,
                     },
                 },
                 default=str,
@@ -158,6 +180,9 @@ def create_app(service: CameraService) -> FastAPI:
                 if service.latest_frame() and service.latest_frame().seq != client.last_seq:
                     client.frame_event.set()
                 return
+            if op in ASSIST_COMMANDS or op in ("audio_sources", "audio_select", "voice_check"):
+                await client.outbox.put(json.dumps(await run_extra(op, msg.get("args", []), req_id), default=str))
+                return
             if op not in ALLOWED_COMMANDS:
                 await client.outbox.put(json.dumps({"type": "result", "id": req_id, "ok": False, "error": "Unknown command"}))
                 return
@@ -165,6 +190,8 @@ def create_app(service: CameraService) -> FastAPI:
             try:
                 result = await asyncio.wait_for(asyncio.wrap_future(service.submit(op, *args)), timeout=20)
                 reply = {"type": "result", "id": req_id, "ok": True, "data": result}
+                if assist and op in ("focus_at", "autofocus") and isinstance(result, dict) and result.get("focused"):
+                    assist.mark_focus_soon()
             except (UserError, PTPError) as e:
                 reply = {"type": "result", "id": req_id, "ok": False, "error": str(e)}
             except asyncio.TimeoutError:
@@ -173,6 +200,31 @@ def create_app(service: CameraService) -> FastAPI:
                 log.exception("command %s failed", op)
                 reply = {"type": "result", "id": req_id, "ok": False, "error": f"Unexpected error: {e}"}
             await client.outbox.put(json.dumps(reply, default=str))
+
+        async def run_extra(op, args, req_id):
+            try:
+                if op in ASSIST_COMMANDS:
+                    if assist is None:
+                        raise UserError("Assistants are not running")
+                    data = await asyncio.to_thread(getattr(assist, ASSIST_COMMANDS[op]), *args)
+                elif audio is None:
+                    raise UserError("Audio monitor is not running")
+                elif op == "audio_sources":
+                    data = {"sources": await asyncio.to_thread(list_sources), "current": audio.source}
+                elif op == "audio_select":
+                    audio.select(args[0] if args else None)
+                    data = {"current": audio.source}
+                else:  # voice_check
+                    seconds = float(args[0]) if args else 15.0
+                    data = await asyncio.wait_for(asyncio.wrap_future(audio.voice_check(seconds)), timeout=seconds + 10)
+                return {"type": "result", "id": req_id, "ok": True, "data": data}
+            except (UserError, PTPError, RuntimeError) as e:
+                return {"type": "result", "id": req_id, "ok": False, "error": str(e)}
+            except asyncio.TimeoutError:
+                return {"type": "result", "id": req_id, "ok": False, "error": "Timed out — is audio still coming in?"}
+            except Exception as e:
+                log.exception("command %s failed", op)
+                return {"type": "result", "id": req_id, "ok": False, "error": f"Unexpected error: {e}"}
 
         send_task = asyncio.create_task(sender())
         try:

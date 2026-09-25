@@ -9,6 +9,8 @@ import webbrowser
 
 import uvicorn
 
+from .assist import Assist
+from .audio import AudioMonitor
 from .camera import CameraService
 from .server import create_app
 
@@ -31,7 +33,11 @@ def main() -> None:
     )
     service = CameraService()
     service.start()
-    app = create_app(service)
+    assist = Assist(service)
+    assist.start()
+    audio = AudioMonitor(service._emit)
+    audio.start()
+    app = create_app(service, assist, audio)
     host = "0.0.0.0" if args.lan else "127.0.0.1"
     url = f"http://127.0.0.1:{args.port}/"
     if not args.no_browser:
@@ -40,6 +46,8 @@ def main() -> None:
     try:
         uvicorn.run(app, host=host, port=args.port, log_level="warning")
     finally:
+        audio.stop()
+        assist.stop()
         service.stop()
 
 

@@ -253,6 +253,7 @@ def parse_liveview(data: bytes) -> LiveViewFrame:
         else:
             deg = v / 65536.0
             header[key] = round(deg - 360 if deg > 180 else deg, 2)
+    header["lv_remaining_s"] = u16(46)  # candidate: live view auto-off countdown
     remain = u32(64)
     header["clip_remaining_ms"] = remain if remain not in (None, 0xFFFFFFFF) else None
     return LiveViewFrame(jpeg=bytes(data[soi:]), header=header)

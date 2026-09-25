@@ -11,6 +11,11 @@ const S = {
   byKey: {},              // setting key -> setting
   byCode: {},             // code -> setting
   header: null,           // latest live view header
+  face: null,             // latest face analysis
+  audio: {},              // latest audio levels
+  session: {},            // battery/disk estimates
+  assist: null,           // assistant settings (face target, record folder, ...)
+  voiceReport: null,
   frameSize: { w: 640, h: 424 },
   af: { state: "idle", until: 0 },
   pending: {},            // code -> value being set (optimistic UI)
@@ -20,9 +25,10 @@ const S = {
 };
 
 function loadPrefs() {
-  const defaults = { overlays: { grid: false, safe: false, zebra: false, peaking: false, hist: true, level: false }, tab: "exposure", otherScope: false, zebraLevel: 245 };
+  const defaults = { overlays: { grid: false, safe: false, zebra: false, peaking: false, hist: true, level: false, face: true }, tab: "exposure", otherScope: false, zebraLevel: 245, recordOn: "pc", collapsed: {} };
   try {
-    return Object.assign(defaults, JSON.parse(localStorage.getItem("nikonRemote.ui") || "{}"));
+    const saved = JSON.parse(localStorage.getItem("nikonRemote.ui") || "{}");
+    return Object.assign(defaults, saved, { overlays: Object.assign(defaults.overlays, saved.overlays || {}) });
   } catch { return defaults; }
 }
 function savePrefs() {
@@ -97,6 +103,10 @@ function fmtBytes(n) {
   const u = ["B", "KB", "MB", "GB"]; let i = 0;
   while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
   return `${n.toFixed(i ? 1 : 0)} ${u[i]}`;
+}
+function fmtDuration(min) {
+  if (min >= 600) return `${Math.round(min / 60)} h`;
+  return min >= 90 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")} min` : `${min} min`;
 }
 function fmtClock(sec) {
   const m = Math.floor(sec / 60), s = sec % 60;
@@ -177,7 +187,9 @@ function onJson(msg) {
       S.props = {};
       for (const [c, p] of Object.entries(d.props)) S.props[c] = Object.assign(p, { code: Number(c) });
       S.status = d.status;
+      S.face = d.face; S.audio = d.audio || {}; S.session = d.session || {}; S.assist = d.assist;
       buildTabs(); renderAll();
+      loadAudioSources();
       loadPresets();
       break;
     }
@@ -199,6 +211,18 @@ function onJson(msg) {
     }
     case "toast":
       toast(msg.data.text, msg.data.level);
+      break;
+    case "face":
+      S.face = msg.data;
+      renderFace();
+      break;
+    case "audio":
+      S.audio = msg.data;
+      renderAudioLevels();
+      break;
+    case "session":
+      S.session = msg.data;
+      renderAll(false);
       break;
     case "result": {
       const w = waiting.get(msg.id);
@@ -250,6 +274,7 @@ async function onFrame(buf) {
     S.lastFrameAt = performance.now();
     drawFrame();
     renderViewerState();
+    if (header.lv_remaining_s != null && header.lv_remaining_s !== S._lastLvLeft) { S._lastLvLeft = header.lv_remaining_s; renderAll(false); }
   } catch (e) {
     console.warn("bad frame", e);
   } finally {
@@ -307,7 +332,27 @@ function drawOverlay() {
     octx.setLineDash([]);
   }
   if (ov.level) drawLevel(W, H, dpr);
+  if (ov.face) drawFace(W, H, dpr);
   drawAfBox(W, H, dpr);
+}
+
+function drawFace(W, H, dpr) {
+  // eye line target: upper third
+  octx.setLineDash([8 * dpr, 6 * dpr]);
+  octx.strokeStyle = "rgba(120,200,255,.55)"; octx.lineWidth = 1.5 * dpr;
+  octx.beginPath(); octx.moveTo(W * 0.3, H / 3); octx.lineTo(W * 0.7, H / 3); octx.stroke();
+  octx.setLineDash([]);
+  const f = S.face;
+  if (!f || !f.found || performance.now() - S.lastFrameAt > 3000) return;
+  const [x, y, w, h] = f.box;
+  const good = !(f.framing && f.framing.length);
+  octx.strokeStyle = good ? "rgba(51,196,107,.85)" : "rgba(120,200,255,.85)";
+  octx.lineWidth = 1.5 * dpr;
+  octx.strokeRect(x * W, y * H, w * W, h * H);
+  octx.fillStyle = octx.strokeStyle;
+  for (const [ex, ey] of f.eyes) { octx.beginPath(); octx.arc(ex * W, ey * H, 3 * dpr, 0, Math.PI * 2); octx.fill(); }
+  octx.font = `600 ${11 * dpr}px ui-monospace, monospace`; octx.textAlign = "left";
+  octx.fillText(`face ${f.face_luma}%`, x * W, y * H - 5 * dpr);
 }
 
 function drawLevel(W, H, dpr) {
@@ -552,6 +597,23 @@ function renderTopbar() {
   $("#cardChip").title = st.last_clip ? `Last clip: ${st.last_clip.name} (${fmtBytes(st.last_clip.size)})` : "Card";
 
 
+  const onPc = S.ui.recordOn === "pc";
+  $("#recBtn").hidden = onPc && !st.recording;
+  $("#micMeter").hidden = !onPc || !!st.recording;
+  $("#cardChip").hidden = onPc;
+  const bm = S.session.battery_minutes;
+  if (bm != null && !st.ac_power) $("#batteryVal").textContent = `${bat}% · ~${fmtDuration(bm)}`;
+  const lvLeft = st.lv && S.header ? S.header.lv_remaining_s : null;
+  $("#lvTimerChip").hidden = lvLeft == null;
+  if (lvLeft != null) {
+    $("#lvTimerVal").textContent = `LV ${fmtClock(lvLeft)}`;
+    $("#lvTimerChip").className = "chip" + (lvLeft < 60 ? " bad" : lvLeft < 180 ? " warn" : "");
+  }
+  $("#diskChip").hidden = !onPc || S.session.disk_minutes == null;
+  if (S.session.disk_minutes != null) {
+    $("#diskVal").textContent = `${S.session.disk_free_gb} GB · ~${fmtDuration(S.session.disk_minutes)}`;
+    $("#diskChip").className = "chip" + (S.session.disk_minutes < 30 ? " bad" : S.session.disk_minutes < 90 ? " warn" : "");
+  }
   const rec = !!st.recording;
   $("#recBtn").classList.toggle("on", rec);
   const bodyOnly = !rec && bodyOnlyRecording() && !recBlockers().length;
@@ -836,7 +898,31 @@ function computeChecks() {
   if (!movie) add("warn", "Live view is in Photo mode", "Recording needs Movie. Flip the camera's Lv switch to the movie icon.", null);
   else add("ok", "Live view in Movie mode");
 
-  if (movie && !st.recording) {
+  const onPc = S.ui.recordOn === "pc";
+  if (onPc) {
+    const a = S.audio || {};
+    if (a.error) add("bad", "No audio from the mixer", a.error);
+    else if (a.clipping) add("bad", "Mic is clipping", "Turn GAIN down on your mic channel.");
+    else if (!S.voiceReport) add("warn", "Voice not checked yet", "Run the voice check in the Voice & mic panel.", { label: "Check now", run: () => { expandCard("audioCard"); $("#voiceCheckBtn").click(); } });
+    else if (S.voiceReport.recommendations.some((x) => x.level === "bad")) {
+      add("bad", "Voice check found a problem", S.voiceReport.recommendations.find((x) => x.level === "bad").text, { label: "Show", run: () => expandCard("audioCard") });
+    } else {
+      const todo = S.voiceReport.recommendations.filter((x) => x.level !== "ok").length;
+      if (todo) add("warn", `Mixer: ${todo} adjustment${todo > 1 ? "s" : ""} suggested`, "See the Voice & mic panel, then check again.", { label: "Show", run: () => expandCard("audioCard") });
+      else add("ok", "Voice checked — mixer set");
+    }
+    const fi = faceItems().filter((i) => i.level !== "ok");
+    if (st.lv && S.face) {
+      if (fi.length) add("warn", `Face check: ${fi.map((i) => i.title.toLowerCase()).join(", ")}`, null, { label: "Show", run: () => expandCard("faceCard") });
+      else add("ok", "Face exposure, focus and framing good");
+    }
+    const lvLeft = st.lv && S.header ? S.header.lv_remaining_s : null;
+    if (lvLeft != null && lvLeft < 180) add("warn", `Live view turns off in ${fmtClock(lvLeft)}`, "The HDMI feed stops with it. Reset between takes.", { label: "Reset timer", run: () => $("#lvTimerChip").click() });
+    if (S.session.disk_minutes != null && S.session.disk_minutes < 30) add("bad", `PC disk: about ${S.session.disk_minutes} min of recording left`, `Free up space in ${S.session.record_dir}.`);
+  }
+  if (S.session.battery_minutes != null && S.session.battery_minutes < 20 && !st.ac_power) add("warn", `Camera battery: about ${S.session.battery_minutes} min left`, "Swap the battery before a long take, or use the mains adapter.");
+
+  if (movie && !st.recording && !onPc) {
     if (recBlockers().length) add("bad", "Recording is blocked", recBlockers().join(" · "));
     else if (bodyOnlyRecording()) add("ok", "Ready — start with the camera's ● button", "The D7500 doesn't let a computer start a take. The app shows the timer and keeps the preview running.");
     else add("ok", "Ready to record");
@@ -873,7 +959,8 @@ function computeChecks() {
   if (V(wbKey) === 2) add("warn", "White balance is Auto", "Color can shift during a shot. Pick a preset or a Kelvin value.", { label: "Use 5600 K", run: async () => { await setValue(S.byKey[wbKey], 0x8012); await setValue(S.byKey[movie ? "movie_kelvin" : "kelvin"], 5600); } });
   else if (V(wbKey) !== undefined) add("ok", `White balance ${fmtValue(S.byKey[wbKey], V(wbKey))}`);
 
-  if (st.meter != null && st.lv && mode === 1) {
+  const faceJudges = S.ui.recordOn === "pc" && S.face && S.face.found;
+  if (st.meter != null && st.lv && mode === 1 && !faceJudges) {
     const ev = st.meter / METER_STEPS_PER_EV;
     if (Math.abs(ev) > 1) add("warn", `Meter reads ${ev > 0 ? "+" : "−"}${Math.abs(ev).toFixed(1)} EV`, ev > 0 ? "Likely overexposed — faster shutter, smaller aperture or lower ISO." : "Likely underexposed — more light, wider aperture or higher ISO.");
     else add("ok", "Exposure within ±1 EV of the meter");
@@ -959,6 +1046,34 @@ function renderTabs(force = false) {
     for (const s of other) body.append(settingRow(s));
   }
   if (S.ui.tab === "setup") {
+    const cameraRows = [...body.children];
+    body.innerHTML = "";
+    body.append(el("div", { class: "group-title", text: "Recording" }));
+    const recRow = el("div", { class: "row" }, el("div", { class: "row-label" }, el("span", { text: "I record on" }),
+      el("button", { class: "tip", title: "PC: HDMI capture card + recording software (the mic meter replaces the REC button and card checks are hidden). Camera: the camera's own card." }, icon("i-info"))), el("div", { class: "row-ctl" }));
+    const recSeg = el("div", { class: "seg" });
+    for (const [label, v] of [["PC (capture card)", "pc"], ["Camera card", "camera"]]) {
+      const b = el("button", { class: S.ui.recordOn === v ? "on" : "", text: label });
+      b.addEventListener("click", () => { S.ui.recordOn = v; savePrefs(); renderAll(); });
+      recSeg.append(b);
+    }
+    $(".row-ctl", recRow).append(recSeg);
+    body.append(recRow);
+    if (S.assist) {
+      const cfgRow = (label, key, help, type = "text", width) => {
+        const inp = el("input", { class: "text-ctl", type, value: S.assist[key], style: width ? `width:${width}` : null });
+        inp.addEventListener("change", () => run("assist_config", key, type === "number" ? Number(inp.value) : inp.value)
+          .then((r) => { Object.assign(S.assist, r); toast(`${label} saved`, "ok"); }).catch(() => {}));
+        return el("div", { class: "row" }, el("div", { class: "row-label" }, el("span", { text: label }), el("button", { class: "tip", title: help }, icon("i-info"))), el("div", { class: "row-ctl" }, inp));
+      };
+      body.append(cfgRow("Recordings folder", "record_dir", "Where your recording software saves files — used for the disk-space warning."));
+      body.append(cfgRow("Recording bitrate (Mbps)", "record_mbps", "Your recording software's video bitrate, for the minutes-left estimate. OBS 1080p30 is typically 20–50.", "number", "90px"));
+      body.append(el("div", { class: "group-title", text: "Face check" }));
+      body.append(cfgRow("Face brightness target (%)", "face_target", "The face brightness “Expose for my face” aims for. Easiest: when your face looks right, press “Remember this brightness”.", "number", "90px"));
+      body.append(cfgRow("Highest ISO it may use", "max_iso", "“Expose for my face” won't go above this (noise). D7500: 3200–6400 is fine for YouTube.", "number", "90px"));
+    }
+    body.append(el("div", { class: "group-title", text: "Camera" }));
+    cameraRows.forEach((r) => body.append(r));
     const pc = el("div", { class: "row" },
       el("div", { class: "row-label" }, el("span", { text: "PC control mode" }),
         el("span", { class: "tip", title: "Advanced. Lets the app change dial-bound settings (exposure mode, Lv switch) even when live view is off. The camera may refuse to record while it's on." }, icon("i-info"))),
@@ -1096,6 +1211,11 @@ async function toggleRecord() {
   catch (e) { toast(e.message, "error"); }
 }
 
+$("#lvTimerChip").addEventListener("click", async () => {
+  if (!confirm("Restart live view to reset the camera's auto-off timer? The picture (and HDMI output) blanks for 1–2 seconds — don't do it mid-take.")) return;
+  try { await send("restart_lv"); toast("Live view restarted — timer reset", "ok"); } catch (e) { toast(e.message, "error"); }
+});
+
 $("#fullBtn").addEventListener("click", toggleFullscreen);
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen();
@@ -1130,6 +1250,7 @@ document.addEventListener("keydown", (e) => {
     case "p": toggleOverlay("peaking"); break;
     case "h": toggleOverlay("hist"); break;
     case "l": toggleOverlay("level"); break;
+    case "a": toggleOverlay("face"); break;
     case "?": $("#helpModal").hidden = !$("#helpModal").hidden; break;
     case "Escape": $("#helpModal").hidden = true; $("#guideModal").hidden = true; closePop(); break;
     case "ArrowLeft": case "ArrowRight":
@@ -1139,6 +1260,158 @@ document.addEventListener("keydown", (e) => {
       if (/^[1-6]$/.test(e.key) && visible[Number(e.key) - 1]) { S.selectedDial = Number(e.key) - 1; renderDials(); }
       else return;
   }
+});
+
+/* ======================================================================
+   Face check
+   ====================================================================== */
+function faceItems() {
+  const f = S.face, out = [];
+  const add = (level, title, detail) => out.push({ level, title, detail });
+  if (!S.status.lv) return out;
+  if (!f || !f.found) { add("warn", "No face in view", "Sit where you'll record; the checks start when your face is visible."); return out; }
+  const t = f.target ?? (S.assist && S.assist.face_target) ?? 58;
+  const d = f.face_luma - t;
+  if (Math.abs(d) <= 4) add("ok", `Face exposure ${f.face_luma}%`, `Target ${t}%.`);
+  else add("warn", `Face ${d < 0 ? "too dark" : "too bright"}: ${f.face_luma}%`, `Target ${t}%. Press “Expose for my face”.`);
+  if (f.face_clip > 0.02) add("warn", "Highlights on your face are clipping", `${Math.round(f.face_clip * 100)}% of your face is pure white — lower ISO or soften/dim the light.`);
+  if (f.focus_ratio == null) add("warn", "Focus not confirmed", "Press “Focus on my eyes” (or click your eye in the preview).");
+  else if (f.focus_ratio < 0.6) add("warn", "Eyes look softer than after the last focus", "Press “Focus on my eyes” again.");
+  else add("ok", "Eyes in focus");
+  if (f.framing && f.framing.length) f.framing.forEach((tip) => add("warn", "Framing", tip));
+  else add("ok", "Good framing", "Eyes on the upper third, centred.");
+  if (f.separation_stops != null) {
+    if (f.separation_stops >= 2) add("ok", `Background ${f.separation_stops.toFixed(1)} stops darker than you`);
+    else add("warn", `Background only ${Math.max(0, f.separation_stops).toFixed(1)} stops darker than you`, "For a dark background: turn off lights behind you, light only your face, keep Active D-Lighting off.");
+  }
+  return out;
+}
+
+function renderFace() {
+  const items = faceItems();
+  const list = $("#faceList");
+  list.innerHTML = "";
+  for (const c of items) {
+    list.append(el("li", { class: c.level }, icon(c.level === "ok" ? "i-check" : c.level === "bad" ? "i-x" : "i-warn"),
+      el("div", { class: "check-text" }, el("div", { class: "check-title", text: c.title }), c.detail ? el("div", { class: "check-detail", text: c.detail }) : null)));
+  }
+  if (!S.status.lv) list.append(el("li", { class: "preset-empty", text: "Starts when live view is running." }));
+  const warn = items.filter((i) => i.level !== "ok").length;
+  const sum = $("#faceSummary");
+  sum.textContent = !items.length ? "" : warn ? `${warn} to fix` : "Looking good";
+  sum.className = "checks-summary " + (warn ? "warn" : "ok");
+  const found = S.face && S.face.found;
+  $("#faceExposeBtn").disabled = !found; $("#faceFocusBtn").disabled = !found; $("#faceRememberBtn").disabled = !found;
+  drawOverlay();
+}
+
+async function faceAction(btn, op, okText) {
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = "Working…";
+  try {
+    const r = await send(op);
+    if (op === "face_expose") {
+      if (r.ok) toast(`Face exposed: ${r.face}% at ISO ${r.iso} (target ${r.target}%)`, "ok");
+      else toast(r.message || "Couldn't reach the target", "error");
+    } else if (op === "face_focus") {
+      r.focused ? toast("Focused on your eyes", "ok") : toast("Couldn't lock focus on your eyes — more light on your face helps", "error");
+    } else if (op === "face_remember") {
+      if (S.assist) S.assist.face_target = r.target;
+      toast(okText.replace("{t}", r.target), "ok");
+    }
+  } catch (e) { toast(e.message, "error"); }
+  btn.textContent = label;
+  btn.disabled = false;
+}
+$("#faceExposeBtn").addEventListener("click", (e) => faceAction(e.currentTarget, "face_expose"));
+$("#faceFocusBtn").addEventListener("click", (e) => faceAction(e.currentTarget, "face_focus"));
+$("#faceRememberBtn").addEventListener("click", (e) => faceAction(e.currentTarget, "face_remember", "Saved {t}% as your face target"));
+
+/* ======================================================================
+   Voice & mic
+   ====================================================================== */
+const dbPct = (v, lo = -60) => Math.max(0, Math.min(100, ((v - lo) / -lo) * 100));
+function renderAudioLevels() {
+  const a = S.audio || {};
+  const peak = a.peak ?? -120, rms = a.rms ?? -120;
+  $("#amRms").style.width = dbPct(rms) + "%";
+  $("#amPeak").style.left = `calc(${dbPct(peak)}% - 1px)`;
+  const stats = $("#amStats");
+  if (a.error) stats.innerHTML = `<span class="bad">${escapeHtml(a.error)}</span>`;
+  else stats.innerHTML = `Peak <b>${fmtDb(a.peak)}</b> · Loudness <b>${a.lufs_s != null && a.lufs_s > -70 ? a.lufs_s.toFixed(0) + " LUFS" : "–"}</b> · Floor <b>${fmtDb(a.floor)}</b>` +
+    (a.clipping ? ` · <span class="bad">CLIPPING — GAIN down</span>` : "") +
+    (a.checking ? ` · <b>Keep talking… ${Math.ceil(a.check_left)} s</b>` : "");
+  const meter = $("#micMeter");
+  meter.style.setProperty("--lvl", dbPct(rms) + "%");
+  meter.style.setProperty("--pk", dbPct(peak) + "%");
+  meter.classList.toggle("clip", !!a.clipping);
+  $("#micLufs").textContent = a.lufs_s != null && a.lufs_s > -70 ? `${a.lufs_s.toFixed(0)}` : "–";
+  $("#micFoot").textContent = a.error ? "no input" : a.clipping ? "CLIP" : a.checking ? `check ${Math.ceil(a.check_left)}s` : a.speaking ? `pk ${fmtDb(peak)}` : "LUFS";
+  const sum = $("#audioSummary");
+  sum.textContent = a.error ? "No input" : a.clipping ? "Clipping" : a.speaking ? "Voice" : "Listening";
+  sum.className = "checks-summary " + (a.error || a.clipping ? "warn" : "ok");
+}
+function fmtDb(v) { return v == null || v < -100 ? "–" : `${v.toFixed(0)} dB`; }
+
+async function loadAudioSources() {
+  try {
+    const r = await send("audio_sources");
+    const sel = $("#audioSource");
+    sel.innerHTML = "";
+    for (const src of r.sources) sel.append(el("option", { value: src.name, text: src.description }));
+    if (r.current) sel.value = r.current;
+  } catch { /* audio monitor not available */ }
+}
+$("#audioSource").addEventListener("change", (e) => run("audio_select", e.target.value).then(() => toast("Listening to " + e.target.selectedOptions[0].text, "ok")).catch(() => {}));
+
+$("#voiceCheckBtn").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  toast("Talk now, as you would on camera, for 15 seconds…", "info");
+  try {
+    S.voiceReport = await send("voice_check", 15);
+    S.voiceReport.at = new Date();
+    renderVoiceReport();
+  } catch (err) { toast(err.message, "error"); }
+  btn.disabled = false;
+});
+
+function renderVoiceReport() {
+  const r = S.voiceReport, box = $("#voiceReport");
+  box.innerHTML = "";
+  if (!r) return;
+  const head = r.loudness != null
+    ? `Voice check ${r.at.toLocaleTimeString()}: peaks ${r.peak_p95} dBFS · loudness ${r.loudness} LUFS · range ${r.lra ?? "–"} LU`
+    : `Voice check ${r.at.toLocaleTimeString()}`;
+  box.append(el("div", { class: "vr-head", text: head }));
+  const list = el("ul", { class: "check-list" });
+  for (const rec of r.recommendations) {
+    const title = el("div", { class: "check-title" }, el("span", { class: `knob ${rec.action}`, text: rec.control }), rec.text);
+    if (rec.amount) title.append(el("span", { class: "amount", text: rec.amount }));
+    list.append(el("li", { class: rec.level }, icon(rec.level === "ok" ? "i-check" : rec.level === "bad" ? "i-x" : "i-warn"), el("div", { class: "check-text" }, title)));
+  }
+  box.append(list);
+  const todo = r.recommendations.filter((x) => x.level !== "ok").length;
+  box.append(el("div", { class: "vr-head", text: todo ? "Adjust, then run the check again." : "Sounds good — ready to record." }));
+}
+
+function expandCard(id) {
+  const c = $("#" + id);
+  c.classList.remove("collapsed"); S.ui.collapsed[id] = false; savePrefs();
+  c.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* ======================================================================
+   Collapsible cards
+   ====================================================================== */
+$$(".collapsible").forEach((card) => {
+  if (S.ui.collapsed[card.id]) card.classList.add("collapsed");
+  $("[data-toggle]", card).addEventListener("click", () => {
+    card.classList.toggle("collapsed");
+    S.ui.collapsed[card.id] = card.classList.contains("collapsed");
+    savePrefs();
+  });
 });
 
 /* ======================================================================
@@ -1272,6 +1545,7 @@ function renderAll(tabs = true) {
     renderFocusControls();
     renderOverlayToggles();
     renderChecks();
+    renderFace();
     if (tabsDirty) { tabsDirty = false; renderTabs(); }
     renderViewerState();
   });

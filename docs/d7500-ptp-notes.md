@@ -33,6 +33,7 @@ Big-endian. The JPEG starts at the first `FF D8 FF`.
 | 20 / 22 | u16 | Displayed area centre |
 | 24 / 26 | u16 | AF box width / height (Normal-area 450×378; 900×756 seen in Face-priority) |
 | 28 / 30 | u16 | AF box centre |
+| 46 | u16 | Seconds until live view auto-off (599 right after start with a 10 min c3 setting). Counts down; only a live view restart resets it (property writes, AF and focus drive don't) |
 | 52 | u32 | Roll, 16.16 fixed-point degrees, 0–360 |
 | 56 | u32 | Pitch, same format |
 | 60 | u32 | Yaw (`0xFFFFFFFF`, not available) |
@@ -67,3 +68,7 @@ Big-endian. The JPEG starts at the first `FF D8 FF`.
 ## Autofocus
 
 `AfDrive` (`0x90C1`), then poll `DeviceReady` (`0x90C8`). It returns OK, `0x2019` busy, or `0xA002` out of focus.
+
+## HDMI
+
+The D7500 exposes no HDMI properties over PTP: `0xD0CC` HDMIOutputDataDepth is absent from its property list. Output resolution, the on-screen display and the output range can only be set in the camera menu.

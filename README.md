@@ -6,6 +6,9 @@ Live preview and full remote control of a USB-tethered **Nikon D7500**, built fo
 
 ## Features
 
+- **Face check:** finds you in the preview and judges exposure on your *face* (the camera's meter is fooled by a dark background). It also checks focus on your eyes, framing (eyes on the upper third), and how many stops darker the background is. **Expose for my face** sets ISO for you, and **Focus on my eyes** runs autofocus on your eyes.
+- **Voice & mic coach for a Mackie ProFX6v3:** listens to the mixer's USB feed and shows live peak, LUFS loudness and noise floor. A 15-second **voice check** tells you which knob to turn (GAIN, COMP, LOW CUT, LOW/MID/HI, PAN) and roughly how far, for a podcast-style voice.
+- **Session warnings:** the camera's live view auto-off countdown (it cuts the HDMI feed; one-click reset), camera battery minutes left, PC disk minutes left, and mic clipping or no signal.
 - **Live preview** at about 25–30 fps. In movie mode it shows the real exposure. Click anywhere to focus there.
 - **Dials** for shutter, aperture, ISO, EV, white balance and Kelvin. Use the arrows, the mouse wheel, or the keyboard, or click a value to see the full list. Each dial has an ⓘ that explains it in plain language.
 - **Focus bar:** AF, Near/Far nudges in three sizes, AF-S / AF-F / MF, AF-area mode, and zoom from 25% to 200% for checking focus.
@@ -19,7 +22,7 @@ Live preview and full remote control of a USB-tethered **Nikon D7500**, built fo
 
 ## Install
 
-Requires Linux, [uv](https://docs.astral.sh/uv/), and Google Chrome, Chromium or Brave for the app window.
+Requires Linux with PipeWire (for the mic coach), [uv](https://docs.astral.sh/uv/), and Google Chrome, Chromium or Brave for the app window.
 
 ```bash
 git clone https://github.com/deniswsrosa/nikon-remote.git
@@ -41,14 +44,21 @@ Your user needs access to the camera's USB device. Ubuntu grants it through `lib
 
 Close Entangle, gphoto2 or anything else that might be using the camera first. Only one program can talk to it at a time.
 
-## Recording workflow
+## Recording workflow (HDMI capture card + mic into the PC)
 
-1. On the camera: Lv switch on **movie**, a charged battery (or the EP-5B + EH-5c mains adapter), and a card with space.
+1. On the camera: Lv switch on **movie**, a charged battery (or the EP-5B + EH-5c mains adapter), and HDMI to the capture card.
 2. Open Nikon Remote and **apply a preset** that matches your light.
-3. **Click your eye** in the preview. Press **Z** to zoom to 100% and check it's sharp.
-4. **Set ISO** until your face looks right. Zebras (**E**) shouldn't cover your skin.
-5. Make sure the **pre-flight check** is green.
-6. Press **● on the camera** to record. The D7500 doesn't let a computer start a recording (see below). The app shows the timer and keeps the preview running.
+3. Sit in position. Press **Focus on my eyes**, then **Expose for my face**. Once your face looks right, **Remember this brightness** saves that as your target.
+4. Set the mixer to the *ProFX6v3 starting point* (Voice & mic panel) and run the **voice check**. Adjust the knobs it names, and repeat until it says you're good.
+5. Make sure the **pre-flight check** is green. Reset the live view timer (⏱ chip) right before a long take.
+6. Record in your capture software (e.g. OBS at 1920×1080, 30 fps).
+
+If you record to the camera's card instead, switch **Setup → I record on → Camera card**. The D7500 only starts a card recording from its own ● button.
+
+### Capture card notes (UGREEN 15390)
+
+- It delivers at most **1920×1080 at 60 fps or 2560×1440 at 30 fps** to the PC. It accepts a 4K signal but can't capture 4K, so keep the camera at 1080p30. That uses the full sensor width and keeps Active D-Lighting available; 4K would crop 1.5×.
+- These camera settings can't be changed over USB, so set them in the menus once: *Setup → HDMI → Output resolution: 1080p*; *HDMI → Advanced → Live view on-screen display: Off* (clean feed); *Custom setting c3 → Power off delay → Live view:* as long as possible.
 
 See [docs/user-guide.md](docs/user-guide.md) for the full guide, including how to get a dark background.
 
@@ -64,11 +74,21 @@ All three are for a developer talking to camera with a mic and a dark background
 
 ISO is only a starting point: tune it to your light. The drift check ignores ISO for that reason.
 
+## Tests
+
+```bash
+uv run pytest
+```
+
+These cover loudness calibration against the BS.1770 reference, the mixer-advice rules on synthetic voices, and *Expose for my face* converging on a simulated camera.
+
 ## Keyboard
 
-`R` record · `F` autofocus · `[` `]` focus fine · `{` `}` focus coarse · `Z` zoom · `G` grid · `S` safe areas · `E` zebras · `P` peaking · `L` level · `H` histogram · `1`–`6` pick a dial · `←` `→` change it · `?` shortcuts
+`R` record · `F` autofocus · `[` `]` focus fine · `{` `}` focus coarse · `Z` zoom · `G` grid · `S` safe areas · `E` zebras · `P` peaking · `L` level · `A` face overlay · `H` histogram · `1`–`6` pick a dial · `←` `→` change it · `?` shortcuts
 
 ## Known limitations (D7500)
+
+- **Live view turns off about 10 minutes after it starts** (with the current c3 setting), and the HDMI feed goes with it. Camera commands don't reset the timer; only restarting live view does. The app shows the countdown and has a one-click reset (1–2 s blackout).
 
 - **The PC can't start a recording.** The camera answers `InvalidStatus` to Nikon's `StartMovieRecInCard` whenever the PC runs live view: blocker bit 14, "not in application mode". The setting that should clear this (ApplicationMode, `0xD1F0`) is refused by the D7500. Every combination was tested: photo or movie Lv, PC-control mode on or off, the selector set before or after live view, and the shutter-release route. Start and stop takes with the camera's ● button.
 - The 1080p/720p frame-rate labels follow the D850 table in libgphoto2. The 4K vs full-width grouping is verified on the camera; the individual frame rates are not.
@@ -83,6 +103,8 @@ Browser / app window ──WebSocket──▶ FastAPI (server.py) ──▶ Came
 
 - `nikon_remote/ptp.py` is a small PTP-over-USB client with Nikon's vendor operations. It talks to the camera directly instead of through libgphoto2, because libgphoto2 discards the live view header. That header carries the AF box, display area and zoom, the tilt angles and the remaining clip time.
 - `nikon_remote/camera.py` has one thread that owns the USB session. It fetches frames (capped at 30 fps, duplicates dropped), polls camera events, reads status once a second, re-reads settings round-robin as a safety net, and runs commands. Autofocus and focus drive don't block, so the preview keeps moving.
+- `nikon_remote/face.py` does face detection (OpenCV YuNet, `models/`, about 5 ms per frame) and measures face exposure, eye sharpness, framing and background separation. `assist.py` runs it about 3× a second and drives *Expose for my face* (damped ISO steps). It also computes the battery and disk estimates.
+- `nikon_remote/audio.py` streams the mixer through PipeWire (`pw-record`) and computes BS.1770 K-weighted loudness, peak, noise floor, balance and hum. It turns a 15 s speech sample into ProFX6v3 knob advice.
 - `nikon_remote/catalog.py` defines what each property means, its labels, help text and scope (movie/photo), and holds the built-in presets.
 - `nikon_remote/server.py` streams frames over a WebSocket with per-client flow control, so a slow browser never builds up lag.
 - `nikon_remote/desktop.py` runs the server and a Chrome `--app` window with a private profile, and shuts everything down when that window closes.

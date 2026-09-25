@@ -4,12 +4,46 @@ The same guide is built into the app (the **Guide** button in the top bar).
 
 ## Before every recording
 
-1. **On the camera:** Lv switch on **movie**, a charged battery (live view drains it fast; the EP-5B + EH-5c mains adapter avoids this), and a card with space.
+1. **On the camera:** Lv switch on **movie**, a charged battery (live view drains it fast; the EP-5B + EH-5c mains adapter avoids this), and HDMI to the capture card.
 2. **Apply a preset** that matches your light (Presets panel). It sets M mode, 1080p 30p, 1/60, f/3.5, white balance, Picture Control, focus mode and more.
-3. **Click your eye** in the preview. In AF-S the focus locks there and stays put. Press **Z** to zoom to 100% and check it's sharp, then **Z** again to go back.
-4. **Set ISO** with the dial until your face looks right. Turn on zebras (**E**): stripes on your forehead or cheeks mean it's too bright.
-5. **Check the pre-flight panel.** Everything green (or understood) means you're good.
-6. **Press the red ● button on the camera** to start and stop. The D7500 doesn't allow a computer to start recording; the app follows along and shows the timer.
+3. **Sit in position**, then press **Focus on my eyes** and **Expose for my face** (Face check panel).
+4. **Mixer:** set the *ProFX6v3 starting point*, press **Voice check** and talk as you would on camera for 15 seconds. Turn the knobs it names, then check again.
+5. **Check the pre-flight panel.** Everything green (or understood) means you're good. Right before a long take, click the **⏱ LV** chip to reset the camera's live view timer.
+6. **Record** in your capture software. (Recording to the camera's card? Setup → *I record on* → Camera card, then use the camera's ● button.)
+
+## Face check
+
+- **Expose for my face** adjusts ISO until your face reaches your target brightness, in a few damped steps. With a dark background the camera's own meter reads "under" even when your face is perfect, so the face check is what counts.
+- **Remember this brightness:** once your face looks right to you, press it. That becomes the target, which depends on your skin tone and taste.
+- **Focus on my eyes** autofocuses exactly on your eyes. The card warns if they get noticeably softer than right after that focus.
+- **Framing:** the face overlay (**A**) draws a dashed line on the upper third. Your eyes should sit on it, with you centred.
+- **Background:** for the dark-background look it should be at least 2 stops darker than your face.
+
+## Voice & mic (Mackie ProFX6v3)
+
+- The app listens to the mixer's USB feed, which is the same audio your recording software records.
+- **Starting point:** mic in channel 1, LOW CUT in, EQ at 12 o'clock, COMP at about 10 o'clock, FX down, PAN centre, LEVEL and MAIN MIX at U. Raise GAIN until the Level Set LED just flickers on your loudest words.
+- **Voice check** says which knob to turn and roughly how much:
+
+| Knob | When it's suggested |
+|---|---|
+| GAIN | Level too low, too hot, or clipping |
+| PAN | Voice louder on one side |
+| LOW CUT | Rumble under your voice |
+| COMP | Level varies a lot (up) or sounds squashed (down) |
+| LOW (80 Hz) | Boomy (down) or thin (up) |
+| MID (2.5 kHz) | Muffled (up) or harsh (down) |
+| HI (12 kHz) | Dull (up) or hissy/sibilant (down) |
+
+- **Targets for a podcast voice:** speech peaks −12 to −6 dBFS, loudness −22 to −16 LUFS, below −60 dBFS between words. Normalise to −14 LUFS for YouTube in the edit.
+- Trust your ears too. Check on headphones.
+
+## Session warnings
+
+- **⏱ LV chip:** the camera turns live view off when its timer runs out (about 10 minutes by default), and the HDMI feed stops with it. Click the chip between takes to reset it. It's also worth setting a longer delay in the camera: Custom setting c3 → Power off delay → Live view.
+- **Battery:** after a few minutes the chip shows the estimated minutes left.
+- **Disk:** free space and minutes left in your recordings folder (Setup → Recordings folder, Recording bitrate).
+- **Mic:** clipping or no signal shows in the mic meter (where REC used to be) and in the checklist.
 
 ## The screen
 
@@ -71,7 +105,9 @@ The same guide is built into the app (the **Guide** button in the top bar).
 | "Camera not connected" | Turn the camera on and wake it (half-press the shutter). Use a USB **data** cable plugged straight into the PC. Close Entangle and gphoto2. |
 | "Camera is busy (another app is using it)" | Another program, usually Entangle or a file manager window showing the camera, holds the USB device. Close it. |
 | "Live view blocked: Battery exhausted" | Charge or swap the battery. |
-| REC shows *ON CAMERA* | Normal on the D7500: start the take with the camera's ● button. |
+| REC shows *ON CAMERA* | Normal on the D7500 when recording to the card: start the take with the camera's ● button. |
+| Capture card shows black | Turn off *HDMI → Advanced → Live view on-screen display* if the picture has overlays; make sure live view is running (the app starts it); check the ⏱ timer hasn't expired. |
+| Voice check says "Almost no signal" | Mic in channel 1/2, +48V for condenser mics, LEVEL and MAIN MIX up, and the right input selected in the Voice & mic panel. |
 | Preview is black in Photo mode | Exposure preview is on and the scene is dark. Use the *Show brightened preview* button, or add light. |
 | Active D-Lighting / e-VR can't be changed | Not available in 4K. Pick a 1080p or 720p frame size. |
 | Live view mode keeps going back to Photo | The camera's physical Lv switch wins whenever live view restarts. Leave it on movie. |

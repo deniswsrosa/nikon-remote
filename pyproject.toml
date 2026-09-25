@@ -8,6 +8,9 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "websockets>=12",
+    "numpy>=2.4.6",
+    "opencv-python-headless>=5.0.0.93",
+    "scipy>=1.17.1",
 ]
 
 [project.scripts]
@@ -17,3 +20,8 @@ nikon-remote-app = "nikon_remote.desktop:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

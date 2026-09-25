@@ -803,6 +803,19 @@ class CameraService:
         self._recording_stopped(None)
         return {"recording": False}
 
+    def _cmd_restart_lv(self, fut):
+        """Restart live view to reset the camera's live view auto-off timer (brief blackout)."""
+        if self.recording:
+            raise UserError("Not while the camera is recording")
+        if self.lv_on:
+            self._end_lv()
+            time.sleep(0.3)
+        self._next_lv_try = 0
+        self._start_lv()
+        if not self.lv_on:
+            raise UserError(self.status.get("lv_error") or "Live view didn't restart")
+        return {"ok": True}
+
     def _cmd_sync_clock(self, fut):
         now = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
         return self._cmd_set(fut, 0x5011, now)

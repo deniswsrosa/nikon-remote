@@ -21,6 +21,8 @@ from pathlib import Path
 
 import uvicorn
 
+from .assist import Assist
+from .audio import AudioMonitor
 from .camera import CameraService
 from .server import create_app
 
@@ -78,7 +80,11 @@ def main() -> None:
 
     service = CameraService()
     service.start()
-    server = uvicorn.Server(uvicorn.Config(create_app(service), host="127.0.0.1", port=PORT, log_level="warning"))
+    assist = Assist(service)
+    assist.start()
+    audio = AudioMonitor(service._emit)
+    audio.start()
+    server = uvicorn.Server(uvicorn.Config(create_app(service, assist, audio), host="127.0.0.1", port=PORT, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     for _ in range(100):
@@ -99,6 +105,8 @@ def main() -> None:
     finally:
         server.should_exit = True
         thread.join(timeout=5)
+        audio.stop()
+        assist.stop()
         service.stop()
         os._exit(0)
 
