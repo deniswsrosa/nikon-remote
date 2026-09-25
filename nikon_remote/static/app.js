@@ -15,7 +15,7 @@ const S = {
   audio: {},              // latest audio levels
   session: {},            // battery/disk estimates
   assist: null,           // assistant settings (face target, record folder, ...)
-  voiceReport: null,
+  mixer: { step: 1, report: null, state: null, applied: false, busy: false },
   frameSize: { w: 640, h: 424 },
   af: { state: "idle", until: 0 },
   pending: {},            // code -> value being set (optimistic UI)
@@ -190,6 +190,7 @@ function onJson(msg) {
       S.face = d.face; S.audio = d.audio || {}; S.session = d.session || {}; S.assist = d.assist;
       buildTabs(); renderAll();
       loadAudioSources();
+      send("mixer_state").then((st) => { S.mixer.state = st; }).catch(() => {});
       loadPresets();
       break;
     }
@@ -599,7 +600,6 @@ function renderTopbar() {
 
   const onPc = S.ui.recordOn === "pc";
   $("#recBtn").hidden = onPc && !st.recording;
-  $("#micMeter").hidden = !onPc || !!st.recording;
   $("#cardChip").hidden = onPc;
   const bm = S.session.battery_minutes;
   if (bm != null && !st.ac_power) $("#batteryVal").textContent = `${bat}% · ~${fmtDuration(bm)}`;
@@ -655,7 +655,7 @@ const DIALS = [
   { name: "ISO", key: () => (isMovie() ? "movie_iso" : "iso") },
   { name: "EV", key: () => (isMovie() ? "movie_ev" : "ev") },
   { name: "WB", key: () => (isMovie() ? "movie_wb" : "wb") },
-  { name: "Kelvin", key: () => (isMovie() ? "movie_kelvin" : "kelvin"), when: () => V(isMovie() ? "movie_wb" : "wb") === 0x8012 },
+  { name: "Kelvin", key: () => (isMovie() ? "movie_kelvin" : "kelvin"), inactive: () => V(isMovie() ? "movie_wb" : "wb") !== 0x8012 },
 ];
 
 function renderDials() {
@@ -702,14 +702,19 @@ function updateDial(node, d, i) {
   const pending = s && S.pending[s.code];
   const value = pending !== undefined ? pending : p && p.v;
   const valBtn = $(".dial-value", node);
-  valBtn.textContent = p ? fmtValue(s, value) : "–";
+  const text = p ? fmtValue(s, value) : "–";
+  valBtn.textContent = text;
+  valBtn.title = text;
+  valBtn.style.setProperty("--dial-size", text.length > 12 ? "12.5px" : text.length > 9 ? "14.5px" : text.length > 6 ? "17px" : "21px");
+  const inactive = d.inactive && d.inactive();
+  node.classList.toggle("inactive", !!inactive);
   valBtn.style.opacity = pending !== undefined ? 0.55 : 1;
   const locked = !p || !p.w;
   node.classList.toggle("locked", locked);
   const lock = $(".dial-lock", node);
   lock.innerHTML = "";
   if (locked && p) { lock.append(icon("i-lock")); }
-  node.title = locked ? lockReason(s) : `${d.name}: ${s ? s.help || "" : ""}`;
+  node.title = locked ? lockReason(s) : inactive ? "Only used when white balance is set to Kelvin" : `${d.name}: ${s ? s.help || "" : ""}`;
   const ch = choicesOf(p), idx = ch.indexOf(value);
   $$(".dial-step", node)[0].disabled = locked || idx <= 0;
   $$(".dial-step", node)[1].disabled = locked || idx < 0 || idx >= ch.length - 1;
@@ -903,13 +908,15 @@ function computeChecks() {
     const a = S.audio || {};
     if (a.error) add("bad", "No audio from the mixer", a.error);
     else if (a.clipping) add("bad", "Mic is clipping", "Turn GAIN down on your mic channel.");
-    else if (!S.voiceReport) add("warn", "Voice not checked yet", "Run the voice check in the Voice & mic panel.", { label: "Check now", run: () => { expandCard("audioCard"); $("#voiceCheckBtn").click(); } });
-    else if (S.voiceReport.recommendations.some((x) => x.level === "bad")) {
-      add("bad", "Voice check found a problem", S.voiceReport.recommendations.find((x) => x.level === "bad").text, { label: "Show", run: () => expandCard("audioCard") });
-    } else {
-      const todo = S.voiceReport.recommendations.filter((x) => x.level !== "ok").length;
-      if (todo) add("warn", `Mixer: ${todo} adjustment${todo > 1 ? "s" : ""} suggested`, "See the Voice & mic panel, then check again.", { label: "Show", run: () => expandCard("audioCard") });
-      else add("ok", "Voice checked — mixer set");
+    else {
+      const r = S.mixer.report;
+      if (!r) add("warn", "Mixer not checked yet", "Audio tab → set up the ProFX6v3 in 4 short steps.", { label: "Open", run: openAudioTab });
+      else if (r.error) add("bad", "Voice check found a problem", r.error, { label: "Open", run: openAudioTab });
+      else {
+        const todo = mixerChanges(r).length;
+        if (todo && !S.mixer.applied) add("warn", `Mixer: ${todo} change${todo > 1 ? "s" : ""} to make`, "See the Audio tab.", { label: "Open", run: openAudioTab });
+        else add("ok", "Mixer checked");
+      }
     }
     const fi = faceItems().filter((i) => i.level !== "ok");
     if (st.lv && S.face) {
@@ -1012,7 +1019,9 @@ function renderChecks() {
 function buildTabs() {
   const tabs = $("#tabs");
   tabs.innerHTML = "";
-  const all = [...S.catalog.sections, { key: "all", label: "All settings" }];
+  const secs = [...S.catalog.sections];
+  secs.splice(secs.findIndex((x) => x.key === "setup"), 0, { key: "audio", label: "Audio" });
+  const all = [...secs, { key: "all", label: "All settings" }];
   if (!all.some((t) => t.key === S.ui.tab)) S.ui.tab = "exposure";
   for (const t of all) {
     const b = el("button", { role: "tab", "data-tab": t.key, text: t.label });
@@ -1030,6 +1039,7 @@ function renderTabs(force = false) {
   const active = document.activeElement;
   if (!force && body.contains(active) && (active.tagName === "INPUT" || active.tagName === "SELECT")) return; // don't clobber typing
   if (S.ui.tab === "all") { note.innerHTML = ""; renderAllTab(body); return; }
+  if (S.ui.tab === "audio") { note.innerHTML = ""; renderAudioTab(body); return; }
 
   note.innerHTML = "";
   note.append(
@@ -1329,71 +1339,287 @@ $("#faceFocusBtn").addEventListener("click", (e) => faceAction(e.currentTarget, 
 $("#faceRememberBtn").addEventListener("click", (e) => faceAction(e.currentTarget, "face_remember", "Saved {t}% as your face target"));
 
 /* ======================================================================
-   Voice & mic
+   Audio: bottom bar, live GAIN coach, ProFX6v3 setup (Audio tab)
    ====================================================================== */
 const dbPct = (v, lo = -60) => Math.max(0, Math.min(100, ((v - lo) / -lo) * 100));
+function fmtDb(v) { return v == null || v < -100 ? "–" : `${v.toFixed(0)} dB`; }
+const MIXER_BASELINE = { low_cut: true, low: 0, hi: 0 };
+
+function gainHintText(a) {
+  if (!a || a.error) return { cls: "bad", text: "No mic input", arrow: "!", big: "No signal from the mixer", small: a && a.error ? a.error : "" };
+  if (a.clipping) return { cls: "bad", text: "CLIPPING — GAIN ↺ down", arrow: "↺", big: "Clipping — turn GAIN down (counter-clockwise)", small: "The level-set LED shouldn't stay lit." };
+  const h = a.gain_hint || { action: "talk" };
+  if (h.action === "up") return { cls: "warn", text: `GAIN ↻ up ≈ +${h.db} dB`, arrow: "↻", big: `Turn GAIN clockwise ≈ +${h.db} dB`, small: "Slowly, while you keep talking — stop when this turns green." };
+  if (h.action === "down") return { cls: "warn", text: `GAIN ↺ down ≈ ${h.db} dB`, arrow: "↺", big: `Turn GAIN counter-clockwise ≈ ${Math.abs(h.db)} dB`, small: "Slowly, while you keep talking — stop when this turns green." };
+  if (h.action === "ok") return { cls: "ok", text: "Level ✓", arrow: "✓", big: "Stop — GAIN is right", small: `Speech peaks around ${h.p90} dBFS (target −12…−6).` };
+  return { cls: "", text: "Talk to check the level", arrow: "…", big: "Talk at your recording volume", small: "Read something out loud, as you would on camera." };
+}
+
 function renderAudioLevels() {
   const a = S.audio || {};
   const peak = a.peak ?? -120, rms = a.rms ?? -120;
-  $("#amRms").style.width = dbPct(rms) + "%";
-  $("#amPeak").style.left = `calc(${dbPct(peak)}% - 1px)`;
-  const stats = $("#amStats");
-  if (a.error) stats.innerHTML = `<span class="bad">${escapeHtml(a.error)}</span>`;
-  else stats.innerHTML = `Peak <b>${fmtDb(a.peak)}</b> · Loudness <b>${a.lufs_s != null && a.lufs_s > -70 ? a.lufs_s.toFixed(0) + " LUFS" : "–"}</b> · Floor <b>${fmtDb(a.floor)}</b>` +
-    (a.clipping ? ` · <span class="bad">CLIPPING — GAIN down</span>` : "") +
-    (a.checking ? ` · <b>Keep talking… ${Math.ceil(a.check_left)} s</b>` : "");
-  const meter = $("#micMeter");
-  meter.style.setProperty("--lvl", dbPct(rms) + "%");
-  meter.style.setProperty("--pk", dbPct(peak) + "%");
-  meter.classList.toggle("clip", !!a.clipping);
-  $("#micLufs").textContent = a.lufs_s != null && a.lufs_s > -70 ? `${a.lufs_s.toFixed(0)}` : "–";
-  $("#micFoot").textContent = a.error ? "no input" : a.clipping ? "CLIP" : a.checking ? `check ${Math.ceil(a.check_left)}s` : a.speaking ? `pk ${fmtDb(peak)}` : "LUFS";
-  const sum = $("#audioSummary");
-  sum.textContent = a.error ? "No input" : a.clipping ? "Clipping" : a.speaking ? "Voice" : "Listening";
-  sum.className = "checks-summary " + (a.error || a.clipping ? "warn" : "ok");
-}
-function fmtDb(v) { return v == null || v < -100 ? "–" : `${v.toFixed(0)} dB`; }
-
-async function loadAudioSources() {
-  try {
-    const r = await send("audio_sources");
-    const sel = $("#audioSource");
-    sel.innerHTML = "";
-    for (const src of r.sources) sel.append(el("option", { value: src.name, text: src.description }));
-    if (r.current) sel.value = r.current;
-  } catch { /* audio monitor not available */ }
-}
-$("#audioSource").addEventListener("change", (e) => run("audio_select", e.target.value).then(() => toast("Listening to " + e.target.selectedOptions[0].text, "ok")).catch(() => {}));
-
-$("#voiceCheckBtn").addEventListener("click", async (e) => {
-  const btn = e.currentTarget;
-  btn.disabled = true;
-  toast("Talk now, as you would on camera, for 15 seconds…", "info");
-  try {
-    S.voiceReport = await send("voice_check", 15);
-    S.voiceReport.at = new Date();
-    renderVoiceReport();
-  } catch (err) { toast(err.message, "error"); }
-  btn.disabled = false;
-});
-
-function renderVoiceReport() {
-  const r = S.voiceReport, box = $("#voiceReport");
-  box.innerHTML = "";
-  if (!r) return;
-  const head = r.loudness != null
-    ? `Voice check ${r.at.toLocaleTimeString()}: peaks ${r.peak_p95} dBFS · loudness ${r.loudness} LUFS · range ${r.lra ?? "–"} LU`
-    : `Voice check ${r.at.toLocaleTimeString()}`;
-  box.append(el("div", { class: "vr-head", text: head }));
-  const list = el("ul", { class: "check-list" });
-  for (const rec of r.recommendations) {
-    const title = el("div", { class: "check-title" }, el("span", { class: `knob ${rec.action}`, text: rec.control }), rec.text);
-    if (rec.amount) title.append(el("span", { class: "amount", text: rec.amount }));
-    list.append(el("li", { class: rec.level }, icon(rec.level === "ok" ? "i-check" : rec.level === "bad" ? "i-x" : "i-warn"), el("div", { class: "check-text" }, title)));
+  $("#abRms").style.width = dbPct(rms) + "%";
+  $("#abPeak").style.left = `calc(${dbPct(peak)}% - 1px)`;
+  $("#abLufs").textContent = a.lufs_s != null && a.lufs_s > -70 ? `${a.lufs_s.toFixed(0)} LUFS` : "– LUFS";
+  $("#abFloor").textContent = `floor ${fmtDb(a.floor)}`;
+  const h = gainHintText(a);
+  const hint = $("#abHint");
+  hint.textContent = a.checking ? `Keep talking… ${Math.ceil(a.check_left)} s` : h.text;
+  hint.className = "ab-hint " + (a.checking ? "warn" : h.cls);
+  $("#audioBar").classList.toggle("clip", !!a.clipping);
+  // live coach in the Audio tab, if it's open
+  const live = $("#gainLive");
+  if (live) {
+    live.className = "gain-live " + (h.cls === "ok" ? "ok" : a.gain_hint && a.gain_hint.action !== "talk" ? a.gain_hint.action : "");
+    $(".arrow", live).textContent = h.arrow;
+    $(".big", live).textContent = h.big;
+    $(".small", live).textContent = h.small;
   }
-  box.append(list);
-  const todo = r.recommendations.filter((x) => x.level !== "ok").length;
-  box.append(el("div", { class: "vr-head", text: todo ? "Adjust, then run the check again." : "Sounds good — ready to record." }));
+  const cd = $("#checkCountdown");
+  if (cd) cd.textContent = a.checking ? `Keep talking… ${Math.ceil(a.check_left)} s left` : "";
+}
+$("#audioBar").addEventListener("click", openAudioTab);
+
+function openAudioTab() {
+  S.ui.tab = "audio"; savePrefs(); renderTabs(true);
+  $("#tabs").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+let audioSources = { sources: [], current: null };
+async function loadAudioSources() {
+  try { audioSources = await send("audio_sources"); } catch { /* audio monitor not available */ }
+  if (S.ui.tab === "audio") renderTabs(true);
+}
+
+// ---- channel strip drawing (ProFX6v3 Mic/Line 1, top to bottom as on the mixer) ----
+function knobSvg(cx, cy, r, deg, target, label, sub, badge, mark) {
+  const pt = (d, rr) => [cx + rr * Math.sin((d * Math.PI) / 180), cy - rr * Math.cos((d * Math.PI) / 180)];
+  let g = `<circle cx="${cx}" cy="${cy}" r="${r + 5}" fill="none" stroke="#2c3038" stroke-width="1"/>`;
+  for (let d = -150; d <= 150; d += 30) { const [x1, y1] = pt(d, r + 3), [x2, y2] = pt(d, r + (d === 0 ? 9 : 6)); g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${d === 0 ? "#9aa1ab" : "#4a505a"}" stroke-width="${d === 0 ? 2 : 1.2}"/>`; }
+  if (mark != null) { const [mx, my] = pt(mark, r + 11); g += `<text x="${mx}" y="${my + 3}" font-size="8" fill="#9aa1ab" text-anchor="middle" font-weight="700">U</text>`; }
+  g += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#23262c" stroke="${badge ? "#f5a524" : "#3a3f48"}" stroke-width="${badge ? 2 : 1.2}"/>`;
+  const draw = (d, color, w) => { const [x, y] = pt(d, r - 3); return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${color}" stroke-width="${w}" stroke-linecap="round"/>`; };
+  if (target != null && Math.abs(target - deg) > 1) {
+    g += draw(deg, "#5b616b", 2.5) + draw(target, "#f5a524", 3.5);
+    const a0 = Math.min(deg, target), a1 = Math.max(deg, target), [sx, sy] = pt(a0, r + 16), [ex, ey] = pt(a1, r + 16);
+    g += `<path d="M${sx} ${sy} A ${r + 16} ${r + 16} 0 0 1 ${ex} ${ey}" fill="none" stroke="#f5a524" stroke-width="1.5" stroke-dasharray="3 2"/>`;
+  } else g += draw(deg, "#e9ebee", 3);
+  g += `<text x="${cx}" y="${cy + r + 22}" font-size="10" fill="#e9ebee" text-anchor="middle" font-weight="700">${label}</text>`;
+  if (sub) g += `<text x="${cx}" y="${cy + r + 33}" font-size="8" fill="#9aa1ab" text-anchor="middle">${sub}</text>`;
+  if (badge) g += badgeSvg(cx + r + 17, cy - r, badge);
+  return g;
+}
+function buttonSvg(cx, cy, label, isIn, targetIn, badge) {
+  const want = targetIn == null ? isIn : targetIn, change = targetIn != null && targetIn !== isIn;
+  let g = `<rect x="${cx - 22}" y="${cy - 9}" width="44" height="18" rx="4" fill="${want ? "#f5a52455" : "#23262c"}" stroke="${change ? "#f5a524" : "#3a3f48"}" stroke-width="${change ? 2 : 1.2}"/>`;
+  g += `<text x="${cx}" y="${cy + 3.5}" font-size="9" fill="${want ? "#ffd690" : "#9aa1ab"}" text-anchor="middle" font-weight="700">${want ? "IN" : "OUT"}</text>`;
+  g += `<text x="${cx}" y="${cy + 21}" font-size="9.5" fill="#e9ebee" text-anchor="middle" font-weight="700">${label}</text>`;
+  if (badge) g += badgeSvg(cx + 32, cy - 8, badge);
+  return g;
+}
+function badgeSvg(x, y, n) {
+  return `<circle cx="${x}" cy="${y}" r="8" fill="#f5a524"/><text x="${x}" y="${y + 3.5}" font-size="10" text-anchor="middle" font-weight="800" fill="#1a1203">${n}</text>`;
+}
+const eqDeg = (db) => (Math.max(-15, Math.min(15, db)) / 15) * 150;
+
+// cur/target: {gain_dir, low_cut, hi, low, fx, stereo_pan}; badges: {control: n}
+function stripSvg(cur, target, badges = {}) {
+  const t = target || {};
+  let g = `<svg class="strip" viewBox="0 0 128 520" xmlns="http://www.w3.org/2000/svg">`;
+  g += `<rect x="2" y="2" width="124" height="516" rx="10" fill="#17191d" stroke="#2c3038"/>`;
+  g += `<text x="64" y="20" font-size="10" fill="#9aa1ab" text-anchor="middle" font-weight="700" letter-spacing="1">MIC/LINE 1</text>`;
+  // GAIN: we can't know its position, so show the direction to turn
+  const gd = t.gain_dir === "up" ? 45 : t.gain_dir === "down" ? -45 : null;
+  g += knobSvg(64, 62, 19, 0, gd, "GAIN", "0 → +60 dB", badges.gain);
+  g += `<circle cx="100" cy="40" r="4" fill="${S.audio && S.audio.clipping ? "#ff5a4f" : "#3a3f48"}"/><text x="100" y="31" font-size="6.5" fill="#6b727d" text-anchor="middle">LEVEL SET</text>`;
+  g += buttonSvg(64, 128, "LOW CUT", !!cur.low_cut, t.low_cut, badges.low_cut);
+  g += knobSvg(64, 190, 16, eqDeg(cur.hi || 0), t.hi != null ? eqDeg(t.hi) : null, "HI", "12 kHz ±15", badges.hi);
+  g += knobSvg(64, 270, 16, eqDeg(cur.low || 0), t.low != null ? eqDeg(t.low) : null, "LOW", "80 Hz ±15", badges.low);
+  g += buttonSvg(64, 336, "FX", !!cur.fx, t.fx, badges.fx);
+  g += buttonSvg(64, 386, "STEREO PAN", !!cur.stereo_pan, t.stereo_pan, badges.stereo_pan);
+  g += knobSvg(64, 452, 18, 60, null, "LEVEL", "set to U", badges.level, 60);
+  return g + `</svg>`;
+}
+
+// changes a report asks for, in the order you meet them on the strip
+function mixerChanges(r) {
+  if (!r || !r.controls) return [];
+  const c = r.controls, out = [];
+  if (c.gain.action !== "ok") out.push(["gain", "GAIN", c.gain.text]);
+  if (c.low_cut.action !== "ok") out.push(["low_cut", "LOW CUT", c.low_cut.text]);
+  if (c.hi.action !== "ok") out.push(["hi", "HI", c.hi.text]);
+  if (c.low.action !== "ok") out.push(["low", "LOW", c.low.text]);
+  if (c.stereo_pan.action !== "ok") out.push(["stereo_pan", "STEREO PAN", c.stereo_pan.text]);
+  return out;
+}
+
+function instrList(items) {
+  const ul = el("ul", { class: "instr" });
+  items.forEach(([n, ctl, txt, state]) => ul.append(el("li", { class: state }, el("span", { class: "num", text: n }), el("div", {}, el("span", { class: "ctl", text: ctl }), el("span", { class: "txt", text: txt })))));
+  return ul;
+}
+
+function toneChart(t) {
+  const W = 300, H = 110, fmin = Math.log10(60), fmax = Math.log10(17000);
+  const x = (f) => ((Math.log10(f) - fmin) / (fmax - fmin)) * (W - 10) + 5;
+  const all = [...t.measured, ...t.target_curve, ...t.after];
+  const lo = Math.min(...all), hi = Math.max(...all);
+  const y = (v) => H - 14 - ((v - lo) / (hi - lo || 1)) * (H - 24);
+  const line = (vals, color, dash) => `<polyline fill="none" stroke="${color}" stroke-width="2" ${dash ? 'stroke-dasharray="4 3"' : ""} points="${t.freqs.map((f, i) => `${x(f).toFixed(1)},${y(vals[i]).toFixed(1)}`).join(" ")}"/>`;
+  let g = `<svg class="tone-chart" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+  for (const [f, l] of [[100, "100"], [1000, "1k"], [10000, "10k"]]) g += `<line x1="${x(f)}" y1="4" x2="${x(f)}" y2="${H - 12}" stroke="#2c3038"/><text x="${x(f)}" y="${H - 2}" font-size="9" fill="#6b727d" text-anchor="middle">${l} Hz</text>`;
+  g += line(t.target_curve, "#6b8cff", true) + line(t.measured, "#9aa1ab") + line(t.after, "#33c46b");
+  g += `<text x="8" y="12" font-size="9" fill="#9aa1ab">your voice now</text><text x="8" y="23" font-size="9" fill="#33c46b">with the new mixer settings</text><text x="8" y="34" font-size="9" fill="#6b8cff">target: ${escapeHtml(t.target)}</text>`;
+  return g + `</svg>`;
+}
+
+function softwareBox(sw) {
+  const c = sw.compressor, l = sw.limiter, gt = sw.noise_gate;
+  const box = el("div", { class: "soft-chain" });
+  box.innerHTML = `<h4>In your recording software (the ProFX6v3 has no compressor)</h4>
+    <div class="step-help" style="margin:0 0 6px">OBS: right-click the mic source → Filters → add these, in this order. Simulated on your voice: ≈ ${sw.predicted.loudness} LUFS, peaks ${sw.predicted.peak} dBFS.</div>
+    <table>
+      ${gt ? `<tr><td colspan="2"><b>Noise Gate</b></td></tr><tr><td>Close / Open threshold</td><td>${gt.close_db} / ${gt.open_db} dB</td></tr><tr><td>Attack / Hold / Release</td><td>${gt.attack_ms} / ${gt.hold_ms} / ${gt.release_ms} ms</td></tr>` : ""}
+      <tr><td colspan="2"><b>Compressor</b></td></tr>
+      <tr><td>Ratio</td><td>${c.ratio}:1</td></tr><tr><td>Threshold</td><td>${c.threshold_db} dB</td></tr>
+      <tr><td>Attack / Release</td><td>${c.attack_ms} / ${c.release_ms} ms</td></tr><tr><td>Output Gain</td><td>${c.output_gain_db >= 0 ? "+" : ""}${c.output_gain_db} dB</td></tr>
+      <tr><td colspan="2"><b>Limiter</b></td></tr>
+      <tr><td>Threshold / Release</td><td>${l.threshold_db} dB / ${l.release_ms} ms</td></tr>
+    </table>`;
+  return box;
+}
+
+async function runMixerCheck(btn) {
+  S.mixer.busy = true; renderTabs(true);
+  try {
+    S.mixer.report = await send("voice_check", 15);
+    S.mixer.applied = false;
+    if (S.mixer.report.error) toast(S.mixer.report.error, "error");
+  } catch (e) { toast(e.message, "error"); }
+  S.mixer.busy = false;
+  renderTabs(true); renderAll(false);
+}
+
+function renderAudioTab(body) {
+  body.innerHTML = "";
+  const m = S.mixer, cur = m.state || MIXER_BASELINE;
+  const wrap = el("div", { class: "audio-tab" });
+  // input
+  const sel = el("select", { class: "select" });
+  for (const src of audioSources.sources) sel.append(el("option", { value: src.name, text: src.description }));
+  if (audioSources.current) sel.value = audioSources.current;
+  sel.addEventListener("change", () => run("audio_select", sel.value).then(() => toast("Listening to " + sel.selectedOptions[0].text, "ok")).catch(() => {}));
+  wrap.append(el("div", { class: "row" }, el("div", { class: "row-label" }, el("span", { text: "Mic input (mixer USB)" })), el("div", { class: "row-ctl" }, sel)));
+
+  // steps
+  const steps = [["1", "Start position"], ["2", "Set GAIN"], ["3", "Analyse voice"], ["4", "Check again"]];
+  const nav = el("div", { class: "wizard-steps" });
+  steps.forEach(([n, label], i) => {
+    const b = el("button", { class: (m.step === i + 1 ? "on " : "") + (m.step > i + 1 ? "done" : "") }, el("b", { text: `STEP ${n}` }), label);
+    b.addEventListener("click", () => { m.step = i + 1; renderTabs(true); });
+    nav.append(b);
+  });
+  wrap.append(nav);
+
+  if (m.step === 1) {
+    wrap.append(el("div", { class: "step-title", text: "Set channel 1 to this starting position" }),
+      el("p", { class: "step-help", text: "Mic plugged into Mic/Line 1. Set every control on that strip as shown, top to bottom." }));
+    const items = [
+      ["1", "GAIN", "About 9 o'clock for now — you'll set it in step 2.", "change"],
+      ["2", "LOW CUT", "IN (pressed). Removes rumble below 100 Hz.", "change"],
+      ["3", "HI", "12 o'clock — the centre click (flat).", "change"],
+      ["4", "LOW", "12 o'clock — the centre click (flat).", "change"],
+      ["5", "FX", "OUT — no reverb on a voice.", "change"],
+      ["6", "STEREO PAN", "OUT — when IN, channel 1 only plays on the left.", "change"],
+      ["7", "LEVEL", "On the U mark (unity).", "change"],
+    ];
+    const badges = { gain: 1, low_cut: 2, hi: 3, low: 4, fx: 5, stereo_pan: 6, level: 7 };
+    wrap.append(el("div", { class: "strip-wrap", html: stripSvg({ low_cut: true, hi: 0, low: 0, fx: false, stereo_pan: false }, null, badges) }));
+    $(".strip-wrap", wrap).append(instrList(items));
+    wrap.append(el("p", { class: "step-help", html: "Master section: <b>48V</b> on only for a condenser mic (off for dynamic mics like the SM7B). <b>MAIN MIX</b> and <b>PHONES</b> don't change the recording — set them for comfortable monitoring." }));
+    const next = el("button", { class: "btn btn-accent", text: "Done — next" });
+    next.addEventListener("click", async () => { try { m.state = await send("mixer_state", MIXER_BASELINE); } catch {} m.report = null; m.step = 2; renderTabs(true); });
+    wrap.append(next);
+  }
+
+  if (m.step === 2) {
+    wrap.append(el("div", { class: "step-title", text: "Set GAIN while you talk" }),
+      el("p", { class: "step-help", text: "Sit where you'll record, at your normal distance from the mic. Talk at recording volume and turn the GAIN knob slowly as the arrow says. The bottom bar shows the same hint, so you can watch it from the chair." }));
+    wrap.append(el("div", { class: "gain-live", id: "gainLive" }, el("div", { class: "arrow", text: "…" }), el("div", {}, el("div", { class: "big", text: "" }), el("div", { class: "small", text: "" }))));
+    const cur2 = Object.assign({}, cur, { fx: false, stereo_pan: false });
+    const dir = S.audio && S.audio.gain_hint ? S.audio.gain_hint.action : null;
+    wrap.append(el("div", { class: "strip-wrap", html: stripSvg(cur2, { gain_dir: dir }, { gain: 1 }) }));
+    $(".strip-wrap", wrap).append(instrList([["1", "GAIN", "Clockwise = louder. Aim: the level-set LED only flickers on your loudest words, and the arrow turns green.", "change"]]));
+    const next = el("button", { class: "btn btn-accent", text: "Level is right — next" });
+    next.addEventListener("click", () => { m.step = 3; renderTabs(true); });
+    wrap.append(next);
+  }
+
+  if (m.step === 3 || m.step === 4) {
+    const verify = m.step === 4;
+    wrap.append(el("div", { class: "step-title", text: verify ? "Check the new settings" : "Analyse your voice" }),
+      el("p", { class: "step-help", text: verify ? "Talk again for 15 seconds to confirm the mixer changes worked." : "Press the button and talk for 15 seconds, exactly as you will on camera. The app works out the LOW CUT / HI / LOW settings for a podcast-style voice and the settings for your recording software." }));
+    const go = el("button", { class: "btn btn-accent", text: m.busy ? "Listening…" : verify ? "Check again (15 s)" : "Start (15 s)" });
+    go.disabled = m.busy;
+    go.addEventListener("click", () => runMixerCheck(go));
+    wrap.append(el("div", { class: "btn-row", style: "padding:0 0 8px" }, go, el("span", { id: "checkCountdown", class: "step-help", style: "margin:0" })));
+    const r = m.report;
+    if (r && r.error) wrap.append(el("p", { class: "step-help", style: "color:var(--bad)", text: r.error }));
+    if (r && !r.error) {
+      const changes = mixerChanges(r);
+      const target = { gain_dir: r.controls.gain.action === "ok" ? null : r.controls.gain.action, low_cut: r.recommended.low_cut, hi: r.recommended.hi, low: r.recommended.low, stereo_pan: false, fx: false };
+      const badges = {};
+      changes.forEach(([k], i) => (badges[k] = i + 1));
+      wrap.append(el("div", { class: "step-help", text: `Heard ${r.speech_seconds} s of speech · loudness ${r.loudness} LUFS · peaks ${r.peak_p90} dBFS${r.balance && Math.abs(r.balance) > 3 ? ` · ${Math.abs(r.balance).toFixed(0)} dB off-centre` : ""}.` }));
+      wrap.append(el("div", { class: "strip-wrap", html: stripSvg({ ...(r.current || cur), fx: false, stereo_pan: r.controls.stereo_pan.action !== "ok" }, target, badges) }));
+      const items = changes.length
+        ? changes.map(([k, ctl, txt], i) => [String(i + 1), ctl, txt, "change"])
+        : [["✓", "Mixer", "Nothing to change — your channel is set.", "ok"]];
+      if (changes.length) {
+        for (const [k, ctl] of [["gain", "GAIN"], ["low_cut", "LOW CUT"], ["hi", "HI"], ["low", "LOW"], ["stereo_pan", "STEREO PAN"]])
+          if (!badges[k]) items.push(["✓", ctl, r.controls[k].text, "ok"]);
+      }
+      items.push(["✓", "FX / LEVEL", "FX OUT, LEVEL on U.", "ok"]);
+      $(".strip-wrap", wrap).append(instrList(items));
+      if (changes.length) {
+        const applied = el("button", { class: "btn btn-accent", text: "I've made these changes" });
+        applied.addEventListener("click", async () => {
+          try { m.state = await send("mixer_state", { low_cut: r.recommended.low_cut, low: r.recommended.low, hi: r.recommended.hi }); } catch {}
+          m.applied = true; m.step = 4; m.report = null; renderTabs(true); renderAll(false);
+        });
+        wrap.append(el("div", { class: "btn-row", style: "padding:8px 0" }, applied));
+      } else if (verify) {
+        m.applied = true;
+        wrap.append(el("p", { class: "step-help", style: "color:var(--ok);font-weight:600", text: "Your mixer is set. Add the software filters below and you're ready to record." }));
+      }
+      if (r.notes && r.notes.length) { const ul = el("ul", { class: "notes" }); r.notes.forEach((n) => ul.append(el("li", { text: n }))); wrap.append(el("div", { class: "step-help", style: "margin:8px 0 0;color:var(--text)", text: "Things the mixer can't fix:" }), ul); }
+      wrap.append(el("div", { html: toneChart(r.tone) }));
+      wrap.append(softwareBox(r.software));
+    }
+  }
+
+  // reference voice
+  const refRow = el("div", { class: "ref-row" }, el("span", { id: "refName", text: "Tone target: …" }));
+  const up = el("input", { type: "file", accept: "audio/*,video/*", style: "display:none" });
+  const upBtn = el("button", { class: "btn btn-sm", text: "Match a voice I like…", title: "Upload a clip of a podcast/YouTube voice you like (MP3, WAV, M4A or video). Its tone becomes the target." });
+  const clrBtn = el("button", { class: "btn btn-sm", text: "Use built-in target" });
+  upBtn.addEventListener("click", () => up.click());
+  up.addEventListener("change", async () => {
+    const f = up.files[0]; if (!f) return;
+    toast(`Analysing ${f.name}…`);
+    const res = await fetch(`/api/voice-reference?name=${encodeURIComponent(f.name)}`, { method: "POST", body: f }).then((x) => x.json()).catch(() => ({ ok: false, error: "Upload failed" }));
+    res.ok ? toast(`Tone target: ${f.name} (${res.speech_seconds} s of speech). Run the analysis again.`, "ok") : toast(res.error, "error");
+    refreshRefName();
+  });
+  clrBtn.addEventListener("click", () => run("voice_reference", "clear").then(refreshRefName).catch(() => {}));
+  refRow.append(upBtn, clrBtn, up);
+  wrap.append(refRow);
+  body.append(wrap);
+  refreshRefName();
+  renderAudioLevels();
+}
+function refreshRefName() {
+  send("voice_reference").then((r) => { const n = $("#refName"); if (n) n.textContent = `Tone target: ${r.target}`; }).catch(() => {});
 }
 
 function expandCard(id) {

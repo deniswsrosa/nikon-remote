@@ -443,7 +443,8 @@ class PTPCamera:
         except PTPError as e:
             if e.code != RC_DeviceBusy:
                 raise
-        rc = self.wait_ready(3.0)
+        # The D7500 may autofocus as live view starts; in a dark room that takes a few seconds.
+        rc = self.wait_ready(10.0, 0.1)
         if rc not in (RC_OK,):
             raise PTPError(rc, OC_NIKON_StartLiveView)
 
@@ -464,6 +465,14 @@ class PTPCamera:
         if rc == 0xA002:
             return False
         raise PTPError(rc, OC_NIKON_AfDrive)
+
+    def cancel_af(self) -> None:
+        """Abort a focus drive. The D7500 can get stuck mid-AF (every command answers
+        "busy", even in a new session); this frees it immediately."""
+        try:
+            self.transaction(OC_NIKON_AfDriveCancel)
+        except PTPError:
+            pass
 
     def change_af_area(self, x: int, y: int) -> None:
         self.transaction(OC_NIKON_ChangeAfArea, [int(x), int(y)])

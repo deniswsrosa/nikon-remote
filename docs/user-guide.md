@@ -7,7 +7,7 @@ The same guide is built into the app (the **Guide** button in the top bar).
 1. **On the camera:** Lv switch on **movie**, a charged battery (live view drains it fast; the EP-5B + EH-5c mains adapter avoids this), and HDMI to the capture card.
 2. **Apply a preset** that matches your light (Presets panel). It sets M mode, 1080p 30p, 1/60, f/3.5, white balance, Picture Control, focus mode and more.
 3. **Sit in position**, then press **Focus on my eyes** and **Expose for my face** (Face check panel).
-4. **Mixer:** set the *ProFX6v3 starting point*, press **Voice check** and talk as you would on camera for 15 seconds. Turn the knobs it names, then check again.
+4. **Mixer:** Audio tab → follow the 4 steps (start position, GAIN, analyse, check).
 5. **Check the pre-flight panel.** Everything green (or understood) means you're good. Right before a long take, click the **⏱ LV** chip to reset the camera's live view timer.
 6. **Record** in your capture software. (Recording to the camera's card? Setup → *I record on* → Camera card, then use the camera's ● button.)
 
@@ -19,24 +19,34 @@ The same guide is built into the app (the **Guide** button in the top bar).
 - **Framing:** the face overlay (**A**) draws a dashed line on the upper third. Your eyes should sit on it, with you centred.
 - **Background:** for the dark-background look it should be at least 2 stops darker than your face.
 
-## Voice & mic (Mackie ProFX6v3)
+## Audio (Mackie ProFX6v3)
 
-- The app listens to the mixer's USB feed, which is the same audio your recording software records.
-- **Starting point:** mic in channel 1, LOW CUT in, EQ at 12 o'clock, COMP at about 10 o'clock, FX down, PAN centre, LEVEL and MAIN MIX at U. Raise GAIN until the Level Set LED just flickers on your loudest words.
-- **Voice check** says which knob to turn and roughly how much:
+The app listens to the mixer's USB feed, the same audio your recording software records. The **bar at the bottom** always shows your level (the green zone is the target for speech peaks), loudness, noise floor and a live GAIN hint.
 
-| Knob | When it's suggested |
+Your Mic/Line 1 strip, top to bottom, per Mackie's manual:
+
+| Control | Range / what it does |
 |---|---|
-| GAIN | Level too low, too hot, or clipping |
-| PAN | Voice louder on one side |
-| LOW CUT | Rumble under your voice |
-| COMP | Level varies a lot (up) or sounds squashed (down) |
-| LOW (80 Hz) | Boomy (down) or thin (up) |
-| MID (2.5 kHz) | Muffled (up) or harsh (down) |
-| HI (12 kHz) | Dull (up) or hissy/sibilant (down) |
+| GAIN + level-set LED | Mic gain 0 → +60 dB. If the LED stays lit, it's too hot. |
+| LOW CUT (switch) | Cuts below 100 Hz, 18 dB/octave |
+| HI (knob) | ±15 dB shelf above 12 kHz, flat at the centre click |
+| LOW (knob) | ±15 dB shelf below 80 Hz, flat at the centre click |
+| FX (switch) | In = reverb/effects |
+| STEREO PAN (switch) | In = channel 1 plays only on the **left** |
+| LEVEL (knob) | Off … U … +10 dB. Changes the recording. |
 
-- **Targets for a podcast voice:** speech peaks −12 to −6 dBFS, loudness −22 to −16 LUFS, below −60 dBFS between words. Normalise to −14 LUFS for YouTube in the edit.
-- Trust your ears too. Check on headphones.
+There's no compressor and no mid EQ. MAIN MIX doesn't change the recording, because the USB feed is taken before it.
+
+**Audio tab, 4 steps:**
+
+1. **Start position**: the strip is drawn with every control numbered. GAIN about 9 o'clock, LOW CUT in, HI and LOW at 12 o'clock, FX out, STEREO PAN out, LEVEL on U.
+2. **Set GAIN**: talk and turn GAIN slowly the way the arrow says (↻ clockwise = louder). Stop when it turns green: speech peaks −12 to −6 dBFS.
+3. **Analyse voice**: talk for 15 s. The strip is redrawn showing where LOW CUT, HI and LOW should go, as clock positions (12 o'clock = flat, each hour ≈ 3 dB, e.g. "HI to 1 o'clock (+3 dB)"). The chart shows your voice, the target and the predicted result. Press **I've made these changes** when done.
+4. **Check again**: another 15 s confirms it.
+
+Step 3 also lists things the mixer can't fix (boxy or muffled mids, noise), and **OBS filter settings**: compressor ratio/threshold/attack/release/output gain, limiter, and a noise gate if needed. They're computed by simulating those filters on your own voice so it lands at −16 LUFS with peaks under −1 dBFS. In OBS: right-click the mic source → Filters → add them in the listed order.
+
+**Match a voice I like…** uploads a clip (MP3/WAV/M4A/video) of a podcast voice you like. Its tone becomes the target instead of the built-in one.
 
 ## Session warnings
 
@@ -107,7 +117,7 @@ The same guide is built into the app (the **Guide** button in the top bar).
 | "Live view blocked: Battery exhausted" | Charge or swap the battery. |
 | REC shows *ON CAMERA* | Normal on the D7500 when recording to the card: start the take with the camera's ● button. |
 | Capture card shows black | Turn off *HDMI → Advanced → Live view on-screen display* if the picture has overlays; make sure live view is running (the app starts it); check the ⏱ timer hasn't expired. |
-| Voice check says "Almost no signal" | Mic in channel 1/2, +48V for condenser mics, LEVEL and MAIN MIX up, and the right input selected in the Voice & mic panel. |
+| Audio analysis says "Almost no signal" | Mic in Mic/Line 1, 48V on for condenser mics, channel LEVEL on U, and the right input selected in the Audio tab. |
 | Preview is black in Photo mode | Exposure preview is on and the scene is dark. Use the *Show brightened preview* button, or add light. |
 | Active D-Lighting / e-VR can't be changed | Not available in 4K. Pick a 1080p or 720p frame size. |
 | Live view mode keeps going back to Photo | The camera's physical Lv switch wins whenever live view restarts. Leave it on movie. |

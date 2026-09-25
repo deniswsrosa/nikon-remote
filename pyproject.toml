@@ -11,6 +11,9 @@ dependencies = [
     "numpy>=2.4.6",
     "opencv-python-headless>=5.0.0.93",
     "scipy>=1.17.1",
+    "pyloudnorm>=0.2.0",
+    "webrtcvad-wheels>=2.0.14",
+    "pedalboard>=0.9.25",
 ]
 
 [project.scripts]

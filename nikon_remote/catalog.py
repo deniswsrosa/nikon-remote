@@ -184,12 +184,12 @@ SETTINGS: list[Setting] = [
       "High quality records at a higher bitrate: fewer compression artifacts, bigger files. Use High."),
     S("movie_file", 0xD0AF, "File type", "video", "enum", MOVIE_FILE, MOVIE,
       "MOV or MP4. Both work in every editor and on YouTube."),
-    S("mic", 0xD0A2, "Microphone sensitivity", "video", "enum", MICROPHONE, MOVIE,
-      "Applies to the built-in mic and to a mic plugged into the camera's mic jack. Manual keeps the level fixed so it doesn't pump between sentences."),
-    S("mic_level", 0xD0A8, "Manual mic level", "video", "raw", None, MOVIE,
+    S("mic", 0xD0A2, "Camera mic sensitivity", "video", "enum", MICROPHONE, MOVIE,
+      "The camera's own audio (built-in mic or its mic jack) — not your ProFX mixer, which is set up in the Audio tab. Useful as a sync/backup track."),
+    S("mic_level", 0xD0A8, "Camera mic manual level", "video", "raw", None, MOVIE,
       "Used when Microphone sensitivity is Manual (1–20). Speak at your normal volume and raise it until the camera's level meter peaks around −12 dB."),
     S("wind_nr", 0xD0AA, "Wind noise reduction", "video", "enum", ON_OFF, MOVIE,
-      "Cuts low rumble on the built-in mic. Leave off indoors; it also thins out your voice."),
+      "Cuts low rumble on the camera's built-in mic. Leave off indoors."),
     S("evr", 0xD314, "Electronic VR", "video", "enum", ON_OFF, MOVIE,
       "Digital stabilization for handheld shots (1080p/720p only; crops slightly). Off on a tripod."),
     S("lv_size", 0xD1AC, "Preview resolution", "video", "enum", LV_SIZE, BOTH,
@@ -208,7 +208,7 @@ SETTINGS: list[Setting] = [
 SECTIONS = [
     ("exposure", "Exposure"),
     ("image", "Image"),
-    ("video", "Video & audio"),
+    ("video", "Video"),
     ("setup", "Setup"),
 ]
 

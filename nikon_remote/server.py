@@ -12,12 +12,15 @@ import logging
 import struct
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import tempfile
+
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import catalog
 from .assist import Assist
+from . import mixer
 from .audio import AudioMonitor, list_sources
 from .camera import CameraService, UserError
 from .ptp import PTPError
@@ -112,6 +115,21 @@ def create_app(service: CameraService, assist: Assist | None = None, audio: Audi
         snap = service.snapshot()
         return {"status": snap["status"], "props": {hex(c): p for c, p in snap["props"].items()}}
 
+    @app.post("/api/voice-reference")
+    async def upload_reference(request: Request, name: str = "reference voice"):
+        """Raw audio/video file in the body; its speech becomes the tone target."""
+        body = await request.body()
+        if not body:
+            return {"ok": False, "error": "Empty file"}
+        with tempfile.NamedTemporaryFile(suffix=".media") as f:
+            f.write(body)
+            f.flush()
+            try:
+                info = await asyncio.to_thread(mixer.save_reference_from_file, f.name, name)
+            except ValueError as e:
+                return {"ok": False, "error": str(e)}
+        return {"ok": True, **info}
+
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket):
         await ws.accept()
@@ -180,7 +198,7 @@ def create_app(service: CameraService, assist: Assist | None = None, audio: Audi
                 if service.latest_frame() and service.latest_frame().seq != client.last_seq:
                     client.frame_event.set()
                 return
-            if op in ASSIST_COMMANDS or op in ("audio_sources", "audio_select", "voice_check"):
+            if op in ASSIST_COMMANDS or op in ("audio_sources", "audio_select", "voice_check", "mixer_state", "voice_reference"):
                 await client.outbox.put(json.dumps(await run_extra(op, msg.get("args", []), req_id), default=str))
                 return
             if op not in ALLOWED_COMMANDS:
@@ -214,9 +232,16 @@ def create_app(service: CameraService, assist: Assist | None = None, audio: Audi
                 elif op == "audio_select":
                     audio.select(args[0] if args else None)
                     data = {"current": audio.source}
+                elif op == "mixer_state":
+                    data = audio.set_mixer_state(args[0]) if args and args[0] is not None else audio.mixer_state
+                elif op == "voice_reference":
+                    if args and args[0] == "clear":
+                        await asyncio.to_thread(mixer.clear_reference)
+                    _, name = mixer.load_target()
+                    data = {"target": name}
                 else:  # voice_check
                     seconds = float(args[0]) if args else 15.0
-                    data = await asyncio.wait_for(asyncio.wrap_future(audio.voice_check(seconds)), timeout=seconds + 10)
+                    data = await asyncio.wait_for(asyncio.wrap_future(audio.voice_check(seconds)), timeout=seconds + 15)
                 return {"type": "result", "id": req_id, "ok": True, "data": data}
             except (UserError, PTPError, RuntimeError) as e:
                 return {"type": "result", "id": req_id, "ok": False, "error": str(e)}

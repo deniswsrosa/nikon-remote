@@ -7,7 +7,8 @@ Live preview and full remote control of a USB-tethered **Nikon D7500**, built fo
 ## Features
 
 - **Face check:** finds you in the preview and judges exposure on your *face* (the camera's meter is fooled by a dark background). It also checks focus on your eyes, framing (eyes on the upper third), and how many stops darker the background is. **Expose for my face** sets ISO for you, and **Focus on my eyes** runs autofocus on your eyes.
-- **Voice & mic coach for a Mackie ProFX6v3:** listens to the mixer's USB feed and shows live peak, LUFS loudness and noise floor. A 15-second **voice check** tells you which knob to turn (GAIN, COMP, LOW CUT, LOW/MID/HI, PAN) and roughly how far, for a podcast-style voice.
+- **Audio tab: set up a Mackie ProFX6v3 by ear-free numbers.** The app listens to the mixer's USB feed. In 4 steps it shows the Mic/Line 1 strip drawn with **exactly** where each control goes: GAIN set live while you talk, then LOW CUT in/out and HI/LOW as clock positions, fitted to your voice. It also gives **OBS compressor/limiter/gate settings**, because the ProFX6v3 has no compressor; they're simulated on your own voice to hit −16 LUFS. Speech detection uses WebRTC VAD, loudness uses pyloudnorm (BS.1770), and the EQ and compressor are simulated with Spotify's pedalboard.
+- **Bottom audio bar:** live level with a target zone, LUFS, noise floor and the current GAIN hint, readable from your chair.
 - **Session warnings:** the camera's live view auto-off countdown (it cuts the HDMI feed; one-click reset), camera battery minutes left, PC disk minutes left, and mic clipping or no signal.
 - **Live preview** at about 25–30 fps. In movie mode it shows the real exposure. Click anywhere to focus there.
 - **Dials** for shutter, aperture, ISO, EV, white balance and Kelvin. Use the arrows, the mouse wheel, or the keyboard, or click a value to see the full list. Each dial has an ⓘ that explains it in plain language.
@@ -49,7 +50,7 @@ Close Entangle, gphoto2 or anything else that might be using the camera first. O
 1. On the camera: Lv switch on **movie**, a charged battery (or the EP-5B + EH-5c mains adapter), and HDMI to the capture card.
 2. Open Nikon Remote and **apply a preset** that matches your light.
 3. Sit in position. Press **Focus on my eyes**, then **Expose for my face**. Once your face looks right, **Remember this brightness** saves that as your target.
-4. Set the mixer to the *ProFX6v3 starting point* (Voice & mic panel) and run the **voice check**. Adjust the knobs it names, and repeat until it says you're good.
+4. **Audio tab**: follow the 4 steps. Set the starting position, set GAIN live, analyse 15 s of your voice, set LOW CUT/HI/LOW to the drawn positions, then check again. Add the OBS filters it lists.
 5. Make sure the **pre-flight check** is green. Reset the live view timer (⏱ chip) right before a long take.
 6. Record in your capture software (e.g. OBS at 1920×1080, 30 fps).
 
@@ -80,7 +81,7 @@ ISO is only a starting point: tune it to your light. The drift check ignores ISO
 uv run pytest
 ```
 
-These cover loudness calibration against the BS.1770 reference, the mixer-advice rules on synthetic voices, and *Expose for my face* converging on a simulated camera.
+These cover loudness calibration against the BS.1770 reference, the live GAIN hint, the ProFX6v3 advice on a synthetic voice with known problems (quiet, clipping, one-sided, boomy, dull), the OBS chain hitting −16 LUFS, and *Expose for my face* converging on a simulated camera.
 
 ## Keyboard
 
@@ -104,7 +105,8 @@ Browser / app window ──WebSocket──▶ FastAPI (server.py) ──▶ Came
 - `nikon_remote/ptp.py` is a small PTP-over-USB client with Nikon's vendor operations. It talks to the camera directly instead of through libgphoto2, because libgphoto2 discards the live view header. That header carries the AF box, display area and zoom, the tilt angles and the remaining clip time.
 - `nikon_remote/camera.py` has one thread that owns the USB session. It fetches frames (capped at 30 fps, duplicates dropped), polls camera events, reads status once a second, re-reads settings round-robin as a safety net, and runs commands. Autofocus and focus drive don't block, so the preview keeps moving.
 - `nikon_remote/face.py` does face detection (OpenCV YuNet, `models/`, about 5 ms per frame) and measures face exposure, eye sharpness, framing and background separation. `assist.py` runs it about 3× a second and drives *Expose for my face* (damped ISO steps). It also computes the battery and disk estimates.
-- `nikon_remote/audio.py` streams the mixer through PipeWire (`pw-record`) and computes BS.1770 K-weighted loudness, peak, noise floor, balance and hum. It turns a 15 s speech sample into ProFX6v3 knob advice.
+- `nikon_remote/audio.py` streams the mixer through PipeWire (`pw-record`). It meters peak, K-weighted loudness, noise floor and balance, gives the live GAIN hint and captures speech for the analysis.
+- `nikon_remote/mixer.py` turns captured speech into ProFX6v3 settings. WebRTC VAD finds the speech, pyloudnorm measures loudness, and a grid search over LOW/HI/LOW CUT fits the voice's third-octave spectrum to the target (built-in, or a reference clip you upload). The OBS compressor and limiter are then simulated with pedalboard. It follows the controls in Mackie's owner's manual: no compressor, 2-band EQ, stereo-pan *switch*, and USB taken before MAIN MIX.
 - `nikon_remote/catalog.py` defines what each property means, its labels, help text and scope (movie/photo), and holds the built-in presets.
 - `nikon_remote/server.py` streams frames over a WebSocket with per-client flow control, so a slow browser never builds up lag.
 - `nikon_remote/desktop.py` runs the server and a Chrome `--app` window with a private profile, and shuts everything down when that window closes.

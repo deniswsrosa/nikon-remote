@@ -120,6 +120,9 @@ class CameraService:
         self._lv_started_at = 0.0
         self._next_frame_at = 0.0
         self._last_jpeg: bytes | None = None
+        self._last_emit = 0.0
+        self._busy_since: float | None = None
+        self._recoveries = 0
 
         self._frame: Frame | None = None
         self._frame_lock = threading.Lock()
@@ -259,6 +262,8 @@ class CameraService:
         self.cam = cam
         self.lv_on = False
         self.recording = False
+        if cam.device_ready() == RC_DeviceBusy:
+            cam.cancel_af()  # a focus drive left stuck from before would block everything
         # Never disturb a take in progress (e.g. reconnecting after a USB hiccup):
         # keep live view running and pick the recording back up.
         try:
@@ -487,6 +492,21 @@ class CameraService:
             f = cam.get_liveview()
         except PTPError as e:
             if e.code == RC_DeviceBusy:
+                # Normal for a frame or two; if it never clears the camera's live view is stuck
+                # (seen on the D7500) — restart it instead of waiting forever.
+                if self._busy_since is None:
+                    self._busy_since = now
+                elif now - self._busy_since > 2.0 and self._busy is None:
+                    self._busy_since = None
+                    self._recoveries += 1
+                    if self._recoveries % 2 == 1:
+                        log.warning("live view stuck busy for 2 s — cancelling a stuck focus drive")
+                        cam.cancel_af()
+                    else:
+                        log.warning("still stuck — restarting live view")
+                        if not self._unstick():
+                            self._end_lv()
+                            self._next_lv_try = now + 10.0
                 time.sleep(0.005)
                 return
             if e.code == RC_NotLiveView:
@@ -495,9 +515,12 @@ class CameraService:
                 self._next_lv_try = now + 0.5
                 return
             raise
-        if f.jpeg == self._last_jpeg:
-            return  # the camera hasn't produced a new frame yet
+        self._busy_since = None
+        self._recoveries = 0
+        if f.jpeg == self._last_jpeg and now - self._last_emit < 0.5:
+            return  # same picture as last time (camera hasn't refreshed, or a static dark scene)
         self._last_jpeg = f.jpeg
+        self._last_emit = now
         self._seq += 1
         self._fps_n += 1
         with self._frame_lock:
@@ -519,8 +542,15 @@ class CameraService:
         try:
             cam.start_liveview()
         except PTPError as e:
-            self._set_status(lv=False, lv_error=f"Live view could not start: {e}")
-            return
+            if e.code != RC_DeviceBusy:
+                self._set_status(lv=False, lv_error=f"Live view could not start: {e}")
+                return
+            log.warning("camera busy when starting live view — cancelling a stuck focus drive and retrying")
+            if not self._unstick():
+                self._next_lv_try = time.monotonic() + 10  # back off; don't hammer a busy camera
+                self._set_status(lv=False, lv_error="The camera is busy — close any menu or playback on the camera. "
+                                 "If it stays like this, switch the camera off and on.")
+                return
         self.lv_on = True
         self._lv_started_at = time.monotonic()
         want = self.desired_selector
@@ -534,7 +564,29 @@ class CameraService:
         self._set_status(lv=True, lv_error=None)
         self._dirty.update([0xD1A2, LV_ZOOM])
 
+    def _unstick(self) -> bool:
+        """Recover a D7500 stuck 'busy' (a focus drive that never finished): cancel AF,
+        end live view, pause, start it again. Verified on the camera."""
+        cam = self.cam
+        cam.cancel_af()
+        if cam.wait_ready(5.0, 0.2) != RC_OK:
+            return False  # still busy: leave it alone (menus open on the body also do this)
+        try:
+            cam.end_liveview()
+        except PTPError:
+            pass
+        time.sleep(2.0)
+        try:
+            cam.start_liveview()
+            return True
+        except PTPError as e:
+            log.warning("unstick attempt failed: %s", e)
+            return False
+
     def _end_lv(self) -> None:
+        if self._busy is not None:
+            self._busy.future.set_exception(UserError("Live view restarted"))
+            self._busy = None
         try:
             self.cam.end_liveview()
         except PTPError:
@@ -807,9 +859,11 @@ class CameraService:
         """Restart live view to reset the camera's live view auto-off timer (brief blackout)."""
         if self.recording:
             raise UserError("Not while the camera is recording")
+        self.cam.cancel_af()
+        time.sleep(0.2)
         if self.lv_on:
             self._end_lv()
-            time.sleep(0.3)
+            time.sleep(2.0)  # restarting too quickly can leave the D7500 stuck busy
         self._next_lv_try = 0
         self._start_lv()
         if not self.lv_on:

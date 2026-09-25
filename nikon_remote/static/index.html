@@ -97,11 +97,6 @@
     <div class="deck">
       <div class="deck-row">
         <button class="rec-btn" id="recBtn" title="Start/stop recording (R)"><span class="rec-core"></span><span class="rec-label" id="recLabel">REC</span></button>
-        <div class="mic-meter" id="micMeter" hidden title="Your mic (from the mixer's USB feed). Green zone = good speech peaks.">
-          <div class="mic-head"><svg><use href="#i-mic"/></svg><span id="micLufs">–</span></div>
-          <div class="mic-bar"><div class="mic-zone"></div><div class="mic-fill" id="micFill"></div><div class="mic-peak" id="micPeak"></div></div>
-          <div class="mic-foot" id="micFoot">–</div>
-        </div>
         <div class="dials" id="dials"></div>
       </div>
       <div class="deck-row deck-row-2">
@@ -132,6 +127,16 @@
         </div>
       </div>
     </div>
+    <div class="audio-bar" id="audioBar" title="Your mic, from the mixer's USB feed. Click for the Audio tab.">
+      <span class="ab-label"><svg><use href="#i-mic"/></svg>Mic</span>
+      <div class="ab-meter">
+        <div class="ab-track"><div class="ab-zone"></div><div class="ab-rms" id="abRms"></div><div class="ab-peak" id="abPeak"></div></div>
+        <div class="ab-scale"><span>−60</span><span>−40</span><span>−24</span><span>−12</span><span>−6</span><span>0</span></div>
+      </div>
+      <span class="ab-stat" id="abLufs" title="Short-term loudness (3 s)">– LUFS</span>
+      <span class="ab-stat" id="abFloor" title="Noise floor between words">floor –</span>
+      <span class="ab-hint" id="abHint">–</span>
+    </div>
   </section>
 
   <aside class="panel">
@@ -158,34 +163,6 @@
       </div>
     </section>
 
-    <section class="card collapsible" id="audioCard">
-      <div class="card-head" data-toggle>
-        <h2>Voice &amp; mic</h2>
-        <span class="checks-summary" id="audioSummary"></span>
-      </div>
-      <div class="card-body">
-        <div class="audio-meter">
-          <div class="am-scale"><span>−60</span><span>−40</span><span>−24</span><span>−12</span><span>−6</span><span>0 dBFS</span></div>
-          <div class="am-bar"><div class="am-zone"></div><div class="am-rms" id="amRms"></div><div class="am-peak" id="amPeak"></div></div>
-          <div class="am-stats" id="amStats">–</div>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-sm btn-accent" id="voiceCheckBtn" title="Talk normally for 15 seconds; the app tells you which ProFX6v3 knob to turn">Voice check (15 s)</button>
-          <select class="select-sm" id="audioSource" title="Audio input the app listens to"></select>
-        </div>
-        <div class="voice-report" id="voiceReport"></div>
-        <details class="mixer-start">
-          <summary>ProFX6v3 starting point</summary>
-          <ol>
-            <li>Mic in <b>channel 1</b> (channels 1–2 have the COMP knob). <b>+48V</b> only for condenser mics.</li>
-            <li><b>LOW CUT</b> in. <b>EQ</b> LOW / MID / HI at 12 o'clock. <b>COMP</b> at about 10 o'clock.</li>
-            <li><b>FX</b> fully down (no reverb on a voice), <b>PAN</b> at 12 o'clock.</li>
-            <li>Channel <b>LEVEL</b> and <b>MAIN MIX</b> at <b>U</b> (unity).</li>
-            <li>Talk at recording volume and raise <b>GAIN</b> until the Level Set LED just flickers on your loudest words. Then run the voice check.</li>
-          </ol>
-        </details>
-      </div>
-    </section>
 
     <section class="card presets">
       <div class="card-head">
@@ -252,13 +229,13 @@
         <li>Framing tips aim for your eyes on the upper third line (the dashed line with the face overlay, <b>A</b>) and you centred. <b>Background</b> should be at least 2 stops darker than your face for the dark-background look.</li>
       </ul>
 
-      <h3>Voice &amp; mic (Mackie ProFX6v3)</h3>
+      <h3>Audio (Mackie ProFX6v3)</h3>
       <ul>
-        <li>The app listens to the mixer's USB feed — the same audio your recording software gets.</li>
-        <li>Set the mixer to the <b>starting point</b> in the Voice &amp; mic card, then press <b>Voice check</b> and talk as you would on camera for 15 seconds.</li>
-        <li>It tells you which knob to turn and roughly how much: GAIN for level, COMP for evenness, LOW CUT for rumble, LOW / MID / HI for boomy, muffled, harsh or dull sound, PAN if you're only on one side.</li>
-        <li>Targets for a podcast voice: speech peaks −12 to −6 dBFS, loudness −22 to −16 LUFS, quiet (below −60 dBFS) between words. Normalise to −14 LUFS for YouTube in the edit.</li>
-        <li>Trust your ears too — check on headphones.</li>
+        <li>The app listens to the mixer's USB feed — the same audio your recording software records. The bar at the bottom of the screen always shows your level, loudness and a live GAIN hint.</li>
+        <li>Open the <b>Audio</b> tab (or click the bottom bar) and follow the 4 steps: <b>1</b> set the Mic/Line 1 strip to the starting position shown, <b>2</b> turn GAIN while you talk until the arrow turns green, <b>3</b> talk for 15 s — the app draws the strip with exactly where LOW CUT, HI and LOW should go (as clock positions: 12 o'clock is flat, each hour ≈ 3 dB), <b>4</b> check again.</li>
+        <li>The ProFX6v3 has no compressor and no mid EQ, so step 3 also gives exact <b>OBS filter settings</b> (compressor, limiter, noise gate if needed) — simulated on your own voice to land at −16 LUFS.</li>
+        <li>MAIN MIX doesn't change the recording (the USB feed is taken before it). The channel's LEVEL knob does — keep it on U.</li>
+        <li>“Match a voice I like…” lets you upload a clip of a podcast voice; its tone becomes the target.</li>
       </ul>
 
       <h3>Recording with an HDMI capture card</h3>
