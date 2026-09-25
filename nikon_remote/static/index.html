@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nikon Remote</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='%23f5a524'/%3E%3Ccircle cx='12' cy='12' r='4' fill='%23111'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-lock" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="currentColor" d="M11 10h2v7h-2zM11 6.5h2v2h-2z"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M3 4h18v16H3zM9 4v16M15 4v16M3 9.3h18M3 14.7h18"/></symbol>
+    <symbol id="i-zebra" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M3 4h18v16H3z"/><path fill="none" stroke="currentColor" stroke-width="1.6" d="M3 12l8-8M3 19l15-15M8 20l13-13M15 20l6-6"/></symbol>
+    <symbol id="i-peak" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M4 18c3-9 5-12 8-12s5 3 8 12"/><path fill="currentColor" d="M11 3h2v3h-2zM4.2 5.6l1.4-1.4 2.1 2.1-1.4 1.4zM16.3 6.3l2.1-2.1 1.4 1.4-2.1 2.1z"/></symbol>
+    <symbol id="i-hist" viewBox="0 0 24 24"><path fill="currentColor" d="M3 20h2v-6H3zM6 20h2v-10H6zM9 20h2V6H9zM12 20h2V9h-2zM15 20h2v-5h-2zM18 20h2v-8h-2z"/></symbol>
+    <symbol id="i-safe" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M2 3h20v18H2z"/><path fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2 2" d="M5 6h14v12H5z"/></symbol>
+    <symbol id="i-level" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M2 12h6M16 12h6"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M3 7h4l2-3h6l2 3h4v13H3z"/><circle cx="12" cy="13" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/></symbol>
+    <symbol id="i-full" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-kbd" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M2 6h20v12H2z"/><path fill="currentColor" d="M5 9h2v2H5zM9 9h2v2H9zM13 9h2v2h-2zM17 9h2v2h-2zM7 13h10v2H7z"/></symbol>
+    <symbol id="i-focus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5"/><circle cx="12" cy="12" r="3" fill="currentColor"/></symbol>
+    <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2.4" d="M15.5 15.5 21 21M10.5 7.5v6M7.5 10.5h6"/></symbol>
+    <symbol id="i-battery" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M2 7h17v10H2zM21 10v4"/></symbol>
+    <symbol id="i-card" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M6 2h9l4 4v16H6z"/><path fill="currentColor" d="M9 4h1.6v4H9zM12 4h1.6v4H12z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 1 21h22zm-1 7h2v6h-2zm0 8h2v2h-2z"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-chev-l" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="i-chev-r" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2.4" d="M15.5 15.5 21 21"/></symbol>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="conn-dot" id="connDot"></span>
+    <div class="brand-text">
+      <strong id="camName">Nikon Remote</strong>
+      <span id="connText" class="muted">Connecting…</span>
+    </div>
+  </div>
+  <div class="top-chips">
+    <button class="chip chip-mode" id="modeChip" title="Exposure mode"><span class="chip-k">Mode</span><span id="modeVal">–</span></button>
+    <div class="seg seg-lv" id="lvSelector" title="Live view mode (the photo/movie switch around the Lv button). Changing it from here turns on PC control.">
+      <button data-v="0">Photo</button><button data-v="1">Movie</button>
+    </div>
+    <span class="chip" id="formatChip" title="Movie frame size and rate"><span id="formatVal">–</span></span>
+    <span class="chip" id="batteryChip" title="Battery"><svg><use href="#i-battery"/></svg><span id="batteryVal">–</span></span>
+    <span class="chip" id="cardChip" title="Card"><svg><use href="#i-card"/></svg><span id="cardVal">–</span></span>
+  </div>
+  <div class="top-actions">
+    <button class="btn" id="guideBtn" title="How to use this app, and what every setting means"><svg><use href="#i-book"/></svg>Guide</button>
+    <button class="icon-btn" id="helpBtn" title="Keyboard shortcuts (?)"><svg><use href="#i-kbd"/></svg></button>
+    <button class="icon-btn" id="fullBtn" title="Fullscreen preview (F11)"><svg><use href="#i-full"/></svg></button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="stage">
+    <div class="viewer" id="viewer">
+      <canvas id="video"></canvas>
+      <canvas id="overlay"></canvas>
+      <div class="hud hud-tl">
+        <span class="rec-badge" id="recBadge" hidden><span class="rec-dot"></span><span id="recTime">00:00</span><span id="recLeft" class="rec-left"></span></span>
+        <span class="hud-pill" id="fpsPill" title="Preview frame rate">– fps</span>
+        <span class="hud-pill" id="zoomPill" hidden>Zoom</span>
+      </div>
+      <div class="hud hud-tr">
+        <div class="meter" id="meter" title="Camera exposure meter: how far the current settings are from what the camera measures as correct">
+          <div class="meter-scale"><span>-3</span><span>-2</span><span>-1</span><span>0</span><span>+1</span><span>+2</span><span>+3</span></div>
+          <div class="meter-track"><div class="meter-needle" id="meterNeedle"></div></div>
+          <div class="meter-val" id="meterVal">–</div>
+        </div>
+      </div>
+      <canvas id="histogram" class="hud-hist" width="256" height="90" hidden></canvas>
+      <div class="dark-note" id="darkNote" hidden></div>
+      <div class="hud hud-bl" id="clickHint">Click to focus · Shift+click to move the point only</div>
+      <div class="viewer-msg" id="viewerMsg">
+        <div class="spinner"></div>
+        <div class="viewer-msg-title" id="viewerMsgTitle">Connecting to the camera…</div>
+        <div class="viewer-msg-body" id="viewerMsgBody"></div>
+      </div>
+    </div>
+
+    <div class="deck">
+      <div class="deck-row">
+        <button class="rec-btn" id="recBtn" title="Start/stop recording (R)"><span class="rec-core"></span><span class="rec-label" id="recLabel">REC</span></button>
+        <div class="dials" id="dials"></div>
+      </div>
+      <div class="deck-row deck-row-2">
+        <div class="focus-group">
+          <button class="btn btn-accent" id="afBtn" title="Autofocus at the focus point (F)"><svg><use href="#i-focus"/></svg>AF</button>
+          <div class="mf" title="Manual focus nudges ([ ] fine, { } coarse). Works in any focus mode.">
+            <button data-mf="-1" data-size="big" title="Near — big step">«</button>
+            <button data-mf="-1" data-size="medium" title="Near — medium step">‹‹</button>
+            <button data-mf="-1" data-size="fine" title="Near — fine step">‹</button>
+            <span class="mf-label">Near · Far</span>
+            <button data-mf="1" data-size="fine" title="Far — fine step">›</button>
+            <button data-mf="1" data-size="medium" title="Far — medium step">››</button>
+            <button data-mf="1" data-size="big" title="Far — big step">»</button>
+          </div>
+          <div class="seg seg-sm" id="afModeSeg" title="Live view focus mode"></div>
+          <select class="select-sm" id="afAreaSel" title="AF-area mode"></select>
+          <button class="btn" id="zoomBtn" title="Magnify the preview around the focus point to check focus (Z)"><svg><use href="#i-zoom"/></svg><span id="zoomLabel">Zoom</span></button>
+        </div>
+        <div class="overlay-toggles" id="overlayToggles">
+          <button id="snapBtn" title="Save the current preview frame as an image (reference still)"><svg><use href="#i-camera"/></svg></button>
+          <button data-ov="grid" title="Rule-of-thirds grid (G)"><svg><use href="#i-grid"/></svg></button>
+          <button data-ov="safe" title="Title/action safe areas (S)"><svg><use href="#i-safe"/></svg></button>
+          <button data-ov="zebra" title="Zebras on overexposed areas (E)"><svg><use href="#i-zebra"/></svg></button>
+          <button data-ov="peaking" title="Focus peaking (P)"><svg><use href="#i-peak"/></svg></button>
+          <button data-ov="level" title="Virtual horizon from the camera's tilt sensor (L)"><svg><use href="#i-level"/></svg></button>
+          <button data-ov="hist" title="Histogram (H)"><svg><use href="#i-hist"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <section class="card checks" id="checksCard">
+      <div class="card-head">
+        <h2>Pre-flight check</h2>
+        <span class="checks-summary" id="checksSummary"></span>
+      </div>
+      <ul class="check-list" id="checkList"></ul>
+    </section>
+
+    <section class="card presets">
+      <div class="card-head">
+        <h2>Presets</h2>
+        <button class="btn btn-sm" id="savePresetBtn" title="Save every current camera setting as a preset you can re-apply in one click">Save current…</button>
+      </div>
+      <form class="preset-form" id="presetForm" hidden>
+        <input id="presetName" maxlength="60" placeholder="Name, e.g. Interview 25p" autocomplete="off">
+        <button class="btn btn-sm btn-accent" type="submit">Save</button>
+        <button class="btn btn-sm" type="button" id="presetCancel">Cancel</button>
+      </form>
+      <ul class="preset-list" id="presetList"></ul>
+    </section>
+
+    <section class="card settings">
+      <nav class="tabs" id="tabs" role="tablist"></nav>
+      <div class="scope-note" id="scopeNote"></div>
+      <div class="tab-body" id="tabBody"></div>
+    </section>
+  </aside>
+</main>
+
+<div class="popover" id="popover" hidden></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<div class="modal" id="helpModal" hidden>
+  <div class="modal-card">
+    <div class="card-head"><h2>Keyboard shortcuts</h2><button class="icon-btn" data-close><svg><use href="#i-x"/></svg></button></div>
+    <dl class="keys">
+      <dt>R</dt><dd>Start / stop recording</dd>
+      <dt>F</dt><dd>Autofocus</dd>
+      <dt>[ &nbsp; ]</dt><dd>Manual focus near / far (fine)</dd>
+      <dt>{ &nbsp; }</dt><dd>Manual focus near / far (coarse)</dd>
+      <dt>Z</dt><dd>Zoom preview in / out</dd>
+      <dt>G S E P L H</dt><dd>Grid · Safe areas · Zebras · Peaking · Level · Histogram</dd>
+      <dt>1 – 5</dt><dd>Select Shutter · Aperture · ISO · EV · WB dial</dd>
+      <dt>← →  or wheel</dt><dd>Change the selected dial</dd>
+      <dt>Click preview</dt><dd>Focus there (Shift+click: move point only)</dd>
+      <dt>?</dt><dd>This help</dd>
+    </dl>
+  </div>
+</div>
+
+
+<div class="modal" id="guideModal" hidden>
+  <div class="modal-card guide">
+    <div class="card-head"><h2>Guide</h2><button class="icon-btn" data-close aria-label="Close"><svg><use href="#i-x"/></svg></button></div>
+    <div class="guide-body">
+      <h3>Before every recording</h3>
+      <ol>
+        <li>On the camera: <b>Lv switch on 🎥 movie</b>, a charged battery (live view drains it fast — the EP-5B + EH-5c mains adapter avoids this), and a card with space.</li>
+        <li><b>Apply a preset</b> that matches your light (Presets panel). It sets M mode, 1080p 30p, 1/60, f/3.5, white balance, Picture Control, focus mode and more.</li>
+        <li><b>Click your eye</b> in the preview. In AF-S the focus locks there and stays put. Press <b>Z</b> to zoom to 100% and check it's sharp, then Z again to go back.</li>
+        <li><b>Set ISO</b> with the dial until your face looks right. Turn on zebras (<b>E</b>): stripes on your forehead or cheeks mean too bright.</li>
+        <li>Check the <b>Pre-flight check</b> panel. Everything green (or understood) means you're good.</li>
+        <li>Press the red <b>● button on the camera</b> to start and stop. The D7500 doesn't allow a computer to start recording; the app follows along and shows the timer.</li>
+      </ol>
+
+      <h3>The exposure settings</h3>
+      <dl class="glossary">
+        <dt>Shutter speed</dt><dd>How long each frame is exposed. For video use about 1/(2 × frame rate): <b>1/60 at 30p</b>, 1/50 at 25p. Faster looks choppy, slower looks blurry. Matching your mains frequency (1/60 on 60 Hz, 1/50 on 50 Hz) also stops lights from flickering.</dd>
+        <dt>Aperture (f/)</dt><dd>How wide the lens opens. <b>Smaller number = more light and a blurrier background</b> (f/3.5). Bigger number = darker, more in focus (f/8).</dd>
+        <dt>ISO</dt><dd>Brightens the image electronically. Use it last, after shutter and aperture. Higher = brighter but grainier; the D7500 stays clean up to about 3200.</dd>
+        <dt>EV (exposure compensation)</dt><dd>EV means <i>exposure value</i>, counted in stops: +1 EV is twice as bright, −1 EV half as bright. It asks the camera to go brighter or darker <i>than its own automatic choice</i>, so it only matters when the camera decides part of the exposure (Auto ISO, or P/S/A modes). In M with Auto ISO off — the presets' setup — it does nothing; change ISO instead.</dd>
+        <dt>Exposure mode</dt><dd><b>M</b> (manual) keeps everything fixed so brightness never changes mid-take. P/S/A let the camera adjust things.</dd>
+        <dt>White balance &amp; Kelvin</dt><dd>Makes white look white. Pick <i>Kelvin</i> and match your light: warm bulbs ≈ 3200 K, LED video lights ≈ 5600 K, window daylight ≈ 5500–6500 K. Skin too orange → raise the number; too blue → lower it. Avoid Auto: it drifts during a shot.</dd>
+        <dt>Exposure meter</dt><dd>The bar at the top right: how far your settings are from what the camera thinks is "correct". With a dark background it will read under (the background pulls it down) — trust your face and the zebras instead.</dd>
+      </dl>
+
+      <h3>Focus</h3>
+      <dl class="glossary">
+        <dt>AF-S</dt><dd>Focuses once when you click the preview or press AF (<b>F</b>), then holds. Best for sitting and talking.</dd>
+        <dt>AF-F</dt><dd>Keeps refocusing continuously. Follows you if you move, but may visibly "breathe".</dd>
+        <dt>MF</dt><dd>Manual: only the Near/Far buttons (or <b>[ ]</b>, <b>{ }</b>) move the focus.</dd>
+        <dt>AF-area</dt><dd>Normal-area = a small box you place by clicking (click your eye). Wide-area = bigger box. Face-priority / Subject-tracking choose the point themselves.</dd>
+        <dt>Shift+click</dt><dd>Moves the focus box without focusing.</dd>
+      </dl>
+
+      <h3>Preview overlays</h3>
+      <dl class="glossary">
+        <dt>Zebras (E)</dt><dd>Magenta stripes on areas that are almost pure white. Keep them off your skin.</dd>
+        <dt>Focus peaking (P)</dt><dd>Green outlines on the sharpest edges — your eyes and eyelashes should light up.</dd>
+        <dt>Histogram (H)</dt><dd>Brightness distribution. A red bar on the right = clipped highlights; blue on the left = crushed blacks (fine for a dark background).</dd>
+        <dt>Level (L)</dt><dd>Virtual horizon from the camera's tilt sensor; turns green when level.</dd>
+        <dt>Grid (G) / Safe areas (S)</dt><dd>Rule-of-thirds lines (put your eyes near the top line) and the area safe from YouTube's on-screen buttons.</dd>
+      </dl>
+
+      <h3>Getting a dark background</h3>
+      <ul>
+        <li>Light your face from the front or side; turn off lights behind you and keep a few metres between you and the background if you can.</li>
+        <li>Expose for your face (ISO dial + zebras). The background falls into shadow on its own.</li>
+        <li>Keep <b>Active D-Lighting off</b> (the presets do) — it would brighten the background.</li>
+        <li>A small practical light (lamp, LED strip) in the background adds depth without lighting it up.</li>
+      </ul>
+
+      <h3>D7500 limits worth knowing</h3>
+      <ul>
+        <li>Recording can only be started with the camera's ● button.</li>
+        <li>4K crops the image 1.5× (tighter framing) and disables Active D-Lighting and electronic VR. 1080p uses the full sensor width.</li>
+        <li>Clips stop at 29:59.</li>
+        <li>The Lv photo/movie switch wins whenever live view restarts — leave it on movie.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

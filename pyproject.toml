@@ -1,0 +1,19 @@
+[project]
+name = "nikon-remote"
+version = "0.1.0"
+description = "Live view and full remote control for a USB-tethered Nikon D7500"
+requires-python = ">=3.11"
+dependencies = [
+    "pyusb>=1.2",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "websockets>=12",
+]
+
+[project.scripts]
+nikon-remote = "nikon_remote.main:main"
+nikon-remote-app = "nikon_remote.desktop:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
