@@ -37,14 +37,18 @@ Your Mic/Line 1 strip, top to bottom, per Mackie's manual:
 
 There's no compressor and no mid EQ. MAIN MIX doesn't change the recording, because the USB feed is taken before it.
 
-**Audio tab, 4 steps:**
+**Mic setup wizard.** Click the Mic bar at the bottom of the screen, or go to Audio tab → Open the mic setup wizard. It's full-screen, with 8 steps:
 
-1. **Start position**: the strip is drawn with every control numbered. GAIN about 9 o'clock, LOW CUT in, HI and LOW at 12 o'clock, FX out, STEREO PAN out, LEVEL on U.
-2. **Set GAIN**: talk and turn GAIN slowly the way the arrow says (↻ clockwise = louder). Stop when it turns green: speech peaks −12 to −6 dBFS.
-3. **Analyse voice**: talk for 15 s. The strip is redrawn showing where LOW CUT, HI and LOW should go, as clock positions (12 o'clock = flat, each hour ≈ 3 dB, e.g. "HI to 1 o'clock (+3 dB)"). The chart shows your voice, the target and the predicted result. Press **I've made these changes** when done.
-4. **Check again**: another 15 s confirms it.
+1. **Welcome:** sit where you'll record, headphones on, quiet room.
+2. **Mic:** dynamic or condenser. This sets the distance (5–10 cm vs 15–20 cm, slightly off-axis) and the 48V switch.
+3. **Start position:** tick each control on the Mic/Line 1 strip as you set it (GAIN ~9 o'clock, LOW CUT in, HI/LOW at 12, FX out, STEREO PAN out, LEVEL on U).
+4. **GAIN:** read the passage and turn GAIN the way the panel on the right says. The needle averages 10 s of speech and has a dead band, so it won't flip-flop. Next unlocks after 5 s in the green zone.
+5. **Read the passage:** the Rainbow Passage, the standard phonetically balanced text from speech science. The same words every time make readings comparable.
+6. **Adjust:** gauges show your voice (orange dot) against the range real voices fall in (green). Then one change at a time: a big drawing of the control with the current position (grey) and the target (orange), what to do, and why.
+7. **Check:** read again. Each change is compared with the first reading (hollow dot = before), and you're told whether it moved your voice as expected. If it barely moved, it asks whether you turned the right knob.
+8. **Recording software:** exact OBS filter settings (the ProFX6v3 has no compressor), simulated on your voice to land at −16 LUFS.
 
-Step 3 also lists things the mixer can't fix (boxy or muffled mids, noise), and **OBS filter settings**: compressor ratio/threshold/attack/release/output gain, limiter, and a noise gate if needed. They're computed by simulating those filters on your own voice so it lands at −16 LUFS with peaks under −1 dBFS. In OBS: right-click the mic source → Filters → add them in the listed order.
+Why the LOW knob stays at 12 o'clock: on the ProFX6v3 it's an 80 Hz shelf. With LOW CUT in (which a voice always wants), turning it 3 dB changes a voice's low end by only about 0.2 dB. Boominess comes from being close to the mic (proximity effect), so the wizard tells you to move back or closer instead.
 
 **Match a voice I like…** uploads a clip (MP3/WAV/M4A/video) of a podcast voice you like. Its tone becomes the target instead of the built-in one.
 

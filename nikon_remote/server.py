@@ -104,7 +104,7 @@ def create_app(service: CameraService, assist: Assist | None = None, audio: Audi
     @app.get("/")
     async def index():
         html = (STATIC / "index.html").read_text()
-        for name in ("app.js", "app.css"):
+        for name in ("app.js", "app.css", "wizard.js", "wizard.css"):
             version = int((STATIC / name).stat().st_mtime)
             html = html.replace(f"/static/{name}", f"/static/{name}?v={version}")
         return HTMLResponse(html, headers={"Cache-Control": "no-store"})
@@ -198,7 +198,7 @@ def create_app(service: CameraService, assist: Assist | None = None, audio: Audi
                 if service.latest_frame() and service.latest_frame().seq != client.last_seq:
                     client.frame_event.set()
                 return
-            if op in ASSIST_COMMANDS or op in ("audio_sources", "audio_select", "voice_check", "mixer_state", "voice_reference"):
+            if op in ASSIST_COMMANDS or op in ("audio_sources", "audio_select", "voice_check", "voice_stop", "mixer_state", "voice_reference", "voice_script"):
                 await client.outbox.put(json.dumps(await run_extra(op, msg.get("args", []), req_id), default=str))
                 return
             if op not in ALLOWED_COMMANDS:
@@ -232,16 +232,21 @@ def create_app(service: CameraService, assist: Assist | None = None, audio: Audi
                 elif op == "audio_select":
                     audio.select(args[0] if args else None)
                     data = {"current": audio.source}
+                elif op == "voice_stop":
+                    audio.stop_check()
+                    data = {"ok": True}
+                elif op == "voice_script":
+                    data = {"script": mixer.SCRIPT}
                 elif op == "mixer_state":
                     data = audio.set_mixer_state(args[0]) if args and args[0] is not None else audio.mixer_state
                 elif op == "voice_reference":
                     if args and args[0] == "clear":
                         await asyncio.to_thread(mixer.clear_reference)
-                    _, name = mixer.load_target()
+                    _, name = mixer.load_ranges()
                     data = {"target": name}
                 else:  # voice_check
-                    seconds = float(args[0]) if args else 15.0
-                    data = await asyncio.wait_for(asyncio.wrap_future(audio.voice_check(seconds)), timeout=seconds + 15)
+                    seconds = min(float(args[0]) if args else 60.0, 90.0)
+                    data = await asyncio.wait_for(asyncio.wrap_future(audio.voice_check(seconds)), timeout=seconds + 20)
                 return {"type": "result", "id": req_id, "ok": True, "data": data}
             except (UserError, PTPError, RuntimeError) as e:
                 return {"type": "result", "id": req_id, "ok": False, "error": str(e)}

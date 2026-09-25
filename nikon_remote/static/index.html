@@ -6,6 +6,7 @@
 <title>Nikon Remote</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='%23f5a524'/%3E%3Ccircle cx='12' cy='12' r='4' fill='%23111'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/wizard.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -231,11 +232,11 @@
 
       <h3>Audio (Mackie ProFX6v3)</h3>
       <ul>
-        <li>The app listens to the mixer's USB feed — the same audio your recording software records. The bar at the bottom of the screen always shows your level, loudness and a live GAIN hint.</li>
-        <li>Open the <b>Audio</b> tab (or click the bottom bar) and follow the 4 steps: <b>1</b> set the Mic/Line 1 strip to the starting position shown, <b>2</b> turn GAIN while you talk until the arrow turns green, <b>3</b> talk for 15 s — the app draws the strip with exactly where LOW CUT, HI and LOW should go (as clock positions: 12 o'clock is flat, each hour ≈ 3 dB), <b>4</b> check again.</li>
-        <li>The ProFX6v3 has no compressor and no mid EQ, so step 3 also gives exact <b>OBS filter settings</b> (compressor, limiter, noise gate if needed) — simulated on your own voice to land at −16 LUFS.</li>
-        <li>MAIN MIX doesn't change the recording (the USB feed is taken before it). The channel's LEVEL knob does — keep it on U.</li>
-        <li>“Match a voice I like…” lets you upload a clip of a podcast voice; its tone becomes the target.</li>
+        <li>Click the <b>Mic bar</b> at the bottom (or Audio tab → <b>Open the mic setup wizard</b>). It's a full-screen, 8-step guide: mic type and distance, the starting position of every control on Mic/Line 1, GAIN set live, then you read the <b>Rainbow Passage</b> (the same text every time, so readings are comparable).</li>
+        <li>The app compares your voice with the range real voices fall in and shows it as gauges. Changes come <b>one at a time</b>, each drawn big: the knob with its clock hours, where it is now (grey) and the target (orange). Then you read again and it checks that each change actually moved your voice the expected way.</li>
+        <li>On the ProFX6v3 the <b>LOW</b> knob (80 Hz) barely affects a voice once LOW CUT is in, so the wizard keeps it flat and fixes boominess/thinness with <b>mic distance</b> instead. <b>HI</b> is only suggested when your voice is clearly dull or hissy.</li>
+        <li>The live level needle averages 10 seconds of speech on purpose, with a dead band — so a loud or soft sentence won't flip the advice when you haven't touched anything.</li>
+        <li>It ends with exact <b>OBS filter settings</b> (the mixer has no compressor), simulated on your voice to land at −16 LUFS.</li>
       </ul>
 
       <h3>Recording with an HDMI capture card</h3>
@@ -293,5 +294,6 @@
   </div>
 </div>
 <script src="/static/app.js"></script>
+<script src="/static/wizard.js"></script>
 </body>
 </html>

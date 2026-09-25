@@ -25,9 +25,11 @@ def voice(secs: float, seed: int = 0) -> np.ndarray:
             r = np.exp(-np.pi * bw / RATE)
             y = lfilter([1 - r], [1, -2 * r * np.cos(2 * np.pi * f / RATE), r * r], y)
         # breathiness plus an occasional "s"/"f" (fricatives carry speech's highs)
-        b, a = butter(2, [3000, 12000], "bandpass", fs=RATE)
+        b, a = butter(2, [2500, 7000], "bandpass", fs=RATE)
         hiss = lfilter(b, a, rng.standard_normal(syl))
-        y = y / (np.abs(y).max() + 1e-9) + 0.04 * hiss
+        b, a = butter(2, 10000, "highpass", fs=RATE)
+        air = lfilter(b, a, rng.standard_normal(syl))
+        y = y / (np.abs(y).max() + 1e-9) + 0.03 * hiss + 0.0012 * air
         if rng.random() < 0.35:
             b, a = butter(2, [4500, 10000], "bandpass", fs=RATE)
             fric = lfilter(b, a, rng.standard_normal(syl)) * 0.6

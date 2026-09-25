@@ -399,7 +399,9 @@ body.fs .layout { grid-template-columns: 1fr; height: 100%; }
   .brand-text span { display: none; }
   .switch-label { display: none; }
   .ab-scale, .ab-floor, #abFloor { display: none; }
-  .ab-hint { min-width: 0; font-size: 12px; }
+  .audio-bar { flex-wrap: wrap; row-gap: 4px; }
+  .ab-meter { flex-basis: 100%; order: 3; }
+  .ab-hint { min-width: 0; font-size: 12px; white-space: normal; flex: 1; text-align: right; }
   .topbar { gap: 8px; padding: 0 10px; }
   .dials { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dial-step { width: 22px; }

@@ -80,7 +80,8 @@ class AudioMonitor:
         self._clip_until = 0.0
         self.enabled = True
         self.last: dict = {}
-        self._speech_peaks: deque = deque(maxlen=40)  # last 4 s of speech, 100 ms peaks
+        self._speech_peaks: deque = deque(maxlen=100)  # last 10 s of speech, 100 ms peaks
+        self._hint = "talk"
         self._last_speech = 0.0
         self.mixer_state = self._load_state()
 
@@ -186,22 +187,37 @@ class AudioMonitor:
             self._last_speech = now_s
         elif now_s - self._last_speech > 3:
             self._speech_peaks.clear()
+        # Hysteresis: say "OK" inside −12…−6 dBFS, but once OK only change the advice when
+        # clearly outside (below −14 or above −4) — reading louder or softer sentences
+        # shouldn't flip it while the knob hasn't moved.
         hint = {"action": "talk", "db": 0}
-        if len(self._speech_peaks) >= 12:
+        if len(self._speech_peaks) >= 40:
             p90 = float(np.percentile(self._speech_peaks, 90))
             lo, hi_ = mixer.PEAK_TARGET
-            if peak > -1 or p90 > hi_:
-                hint = {"action": "down", "db": round(-9 - p90)}
-            elif p90 < lo:
-                hint = {"action": "up", "db": round(-9 - p90)}
+            state = self._hint
+            if peak > -1:
+                state = "down"
+            elif state == "ok":
+                if p90 < lo - 2:
+                    state = "up"
+                elif p90 > hi_ + 2:
+                    state = "down"
+            elif lo <= p90 <= hi_:
+                state = "ok"
             else:
-                hint = {"action": "ok", "db": 0}
-            hint["p90"] = round(p90, 1)
+                state = "up" if p90 < lo else "down"
+            self._hint = state
+            hint = {"action": state, "db": 0 if state == "ok" else round(-9 - p90), "p90": round(p90, 1),
+                    "speech_s": round(len(self._speech_peaks) / 10, 1)}
+        elif self._speech_peaks:
+            hint = {"action": "listening", "db": 0, "speech_s": round(len(self._speech_peaks) / 10, 1)}
+        else:
+            self._hint = "talk"
 
         now = time.monotonic()
         if self._capture is not None:
             self._capture.append((x.copy(), float(kb[-1].sum()), speaking, peak))
-            if len(self._capture) >= self._capture_blocks:
+            if len(self._capture) >= self._capture_blocks and self._capture_blocks:
                 self._finish_check()
 
         self.last.update(
@@ -230,6 +246,11 @@ class AudioMonitor:
         self._capture_blocks = max(10, int(seconds * 10))
         self._capture_future = fut
         return fut
+
+    def stop_check(self) -> None:
+        """Finish a running check now (e.g. the user finished reading the script)."""
+        if self._capture is not None:
+            self._capture_blocks = len(self._capture)
 
     def _finish_check(self) -> None:
         blocks, fut = self._capture, self._capture_future

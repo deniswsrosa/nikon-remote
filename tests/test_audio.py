@@ -27,7 +27,7 @@ def test_k_weighted_loudness_matches_bs1770_reference():
 
 
 def live_hint(level_db):
-    v = voice(6, seed=1) * 10 ** (level_db / 20)
+    v = voice(14, seed=1) * 10 ** (level_db / 20)
     quiet = np.zeros((RATE * 2, 2)) + 1e-5  # lets the monitor learn the noise floor first
     _, states = run_blocks(np.concatenate([quiet, np.stack([v, v], axis=1)]))
     return states[-1]["gain_hint"]["action"]

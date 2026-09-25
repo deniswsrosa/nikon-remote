@@ -910,11 +910,11 @@ function computeChecks() {
     else if (a.clipping) add("bad", "Mic is clipping", "Turn GAIN down on your mic channel.");
     else {
       const r = S.mixer.report;
-      if (!r) add("warn", "Mixer not checked yet", "Audio tab → set up the ProFX6v3 in 4 short steps.", { label: "Open", run: openAudioTab });
-      else if (r.error) add("bad", "Voice check found a problem", r.error, { label: "Open", run: openAudioTab });
+      if (!r) add("warn", "Mic not set up yet", "Run the mic setup wizard (about 5 minutes).", { label: "Start", run: () => wizardOpen() });
+      else if (r.error) add("bad", "Voice check found a problem", r.error, { label: "Open", run: () => wizardOpen() });
       else {
         const todo = mixerChanges(r).length;
-        if (todo && !S.mixer.applied) add("warn", `Mixer: ${todo} change${todo > 1 ? "s" : ""} to make`, "See the Audio tab.", { label: "Open", run: openAudioTab });
+        if (todo && !S.mixer.applied) add("warn", `Mixer: ${todo} change${todo > 1 ? "s" : ""} to make`, "See the Audio tab.", { label: "Open", run: () => wizardOpen() });
         else add("ok", "Mixer checked");
       }
     }
@@ -1375,10 +1375,9 @@ function renderAudioLevels() {
     $(".big", live).textContent = h.big;
     $(".small", live).textContent = h.small;
   }
-  const cd = $("#checkCountdown");
-  if (cd) cd.textContent = a.checking ? `Keep talking… ${Math.ceil(a.check_left)} s left` : "";
+  if (typeof wizAudio === "function") wizAudio(a);
 }
-$("#audioBar").addEventListener("click", openAudioTab);
+$("#audioBar").addEventListener("click", () => wizardOpen());
 
 function openAudioTab() {
   S.ui.tab = "audio"; savePrefs(); renderTabs(true);
@@ -1441,16 +1440,9 @@ function stripSvg(cur, target, badges = {}) {
   return g + `</svg>`;
 }
 
-// changes a report asks for, in the order you meet them on the strip
+// changes the latest analysis asks for
 function mixerChanges(r) {
-  if (!r || !r.controls) return [];
-  const c = r.controls, out = [];
-  if (c.gain.action !== "ok") out.push(["gain", "GAIN", c.gain.text]);
-  if (c.low_cut.action !== "ok") out.push(["low_cut", "LOW CUT", c.low_cut.text]);
-  if (c.hi.action !== "ok") out.push(["hi", "HI", c.hi.text]);
-  if (c.low.action !== "ok") out.push(["low", "LOW", c.low.text]);
-  if (c.stereo_pan.action !== "ok") out.push(["stereo_pan", "STEREO PAN", c.stereo_pan.text]);
-  return out;
+  return r && r.steps ? r.steps : [];
 }
 
 function instrList(items) {
@@ -1459,156 +1451,39 @@ function instrList(items) {
   return ul;
 }
 
-function toneChart(t) {
-  const W = 300, H = 110, fmin = Math.log10(60), fmax = Math.log10(17000);
-  const x = (f) => ((Math.log10(f) - fmin) / (fmax - fmin)) * (W - 10) + 5;
-  const all = [...t.measured, ...t.target_curve, ...t.after];
-  const lo = Math.min(...all), hi = Math.max(...all);
-  const y = (v) => H - 14 - ((v - lo) / (hi - lo || 1)) * (H - 24);
-  const line = (vals, color, dash) => `<polyline fill="none" stroke="${color}" stroke-width="2" ${dash ? 'stroke-dasharray="4 3"' : ""} points="${t.freqs.map((f, i) => `${x(f).toFixed(1)},${y(vals[i]).toFixed(1)}`).join(" ")}"/>`;
-  let g = `<svg class="tone-chart" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
-  for (const [f, l] of [[100, "100"], [1000, "1k"], [10000, "10k"]]) g += `<line x1="${x(f)}" y1="4" x2="${x(f)}" y2="${H - 12}" stroke="#2c3038"/><text x="${x(f)}" y="${H - 2}" font-size="9" fill="#6b727d" text-anchor="middle">${l} Hz</text>`;
-  g += line(t.target_curve, "#6b8cff", true) + line(t.measured, "#9aa1ab") + line(t.after, "#33c46b");
-  g += `<text x="8" y="12" font-size="9" fill="#9aa1ab">your voice now</text><text x="8" y="23" font-size="9" fill="#33c46b">with the new mixer settings</text><text x="8" y="34" font-size="9" fill="#6b8cff">target: ${escapeHtml(t.target)}</text>`;
-  return g + `</svg>`;
-}
 
-function softwareBox(sw) {
-  const c = sw.compressor, l = sw.limiter, gt = sw.noise_gate;
-  const box = el("div", { class: "soft-chain" });
-  box.innerHTML = `<h4>In your recording software (the ProFX6v3 has no compressor)</h4>
-    <div class="step-help" style="margin:0 0 6px">OBS: right-click the mic source → Filters → add these, in this order. Simulated on your voice: ≈ ${sw.predicted.loudness} LUFS, peaks ${sw.predicted.peak} dBFS.</div>
-    <table>
-      ${gt ? `<tr><td colspan="2"><b>Noise Gate</b></td></tr><tr><td>Close / Open threshold</td><td>${gt.close_db} / ${gt.open_db} dB</td></tr><tr><td>Attack / Hold / Release</td><td>${gt.attack_ms} / ${gt.hold_ms} / ${gt.release_ms} ms</td></tr>` : ""}
-      <tr><td colspan="2"><b>Compressor</b></td></tr>
-      <tr><td>Ratio</td><td>${c.ratio}:1</td></tr><tr><td>Threshold</td><td>${c.threshold_db} dB</td></tr>
-      <tr><td>Attack / Release</td><td>${c.attack_ms} / ${c.release_ms} ms</td></tr><tr><td>Output Gain</td><td>${c.output_gain_db >= 0 ? "+" : ""}${c.output_gain_db} dB</td></tr>
-      <tr><td colspan="2"><b>Limiter</b></td></tr>
-      <tr><td>Threshold / Release</td><td>${l.threshold_db} dB / ${l.release_ms} ms</td></tr>
-    </table>`;
-  return box;
-}
 
-async function runMixerCheck(btn) {
-  S.mixer.busy = true; renderTabs(true);
-  try {
-    S.mixer.report = await send("voice_check", 15);
-    S.mixer.applied = false;
-    if (S.mixer.report.error) toast(S.mixer.report.error, "error");
-  } catch (e) { toast(e.message, "error"); }
-  S.mixer.busy = false;
-  renderTabs(true); renderAll(false);
-}
 
 function renderAudioTab(body) {
   body.innerHTML = "";
-  const m = S.mixer, cur = m.state || MIXER_BASELINE;
   const wrap = el("div", { class: "audio-tab" });
-  // input
+  const open = el("button", { class: "btn btn-accent", style: "height:44px;font-size:15px;width:100%;justify-content:center", text: "Open the mic setup wizard" });
+  open.addEventListener("click", () => wizardOpen());
+  wrap.append(el("p", { class: "step-help", text: "A full-screen, step-by-step guide for the ProFX6v3: mic position, starting position, GAIN, then it listens to you reading a fixed passage and tells you exactly what to change — and checks it worked." }), open);
+
   const sel = el("select", { class: "select" });
   for (const src of audioSources.sources) sel.append(el("option", { value: src.name, text: src.description }));
   if (audioSources.current) sel.value = audioSources.current;
   sel.addEventListener("change", () => run("audio_select", sel.value).then(() => toast("Listening to " + sel.selectedOptions[0].text, "ok")).catch(() => {}));
-  wrap.append(el("div", { class: "row" }, el("div", { class: "row-label" }, el("span", { text: "Mic input (mixer USB)" })), el("div", { class: "row-ctl" }, sel)));
+  wrap.append(el("div", { class: "group-title", text: "Input" }), el("div", { class: "row" }, el("div", { class: "row-label" }, el("span", { text: "Mic input (mixer USB)" })), el("div", { class: "row-ctl" }, sel)));
 
-  // steps
-  const steps = [["1", "Start position"], ["2", "Set GAIN"], ["3", "Analyse voice"], ["4", "Check again"]];
-  const nav = el("div", { class: "wizard-steps" });
-  steps.forEach(([n, label], i) => {
-    const b = el("button", { class: (m.step === i + 1 ? "on " : "") + (m.step > i + 1 ? "done" : "") }, el("b", { text: `STEP ${n}` }), label);
-    b.addEventListener("click", () => { m.step = i + 1; renderTabs(true); });
-    nav.append(b);
-  });
-  wrap.append(nav);
+  const r = S.mixer.report, st = S.mixer.state || MIXER_BASELINE;
+  wrap.append(el("div", { class: "group-title", text: "Channel 1 as set by the wizard" }),
+    el("div", { class: "strip-wrap", html: stripSvg({ ...st, fx: false, stereo_pan: false }, null, {}) }));
+  const facts = [["✓", "LOW CUT", st.low_cut ? "IN" : "OUT", "ok"], ["✓", "HI", mixerClock(st.hi), "ok"], ["✓", "LOW", mixerClock(st.low), "ok"], ["✓", "FX / STEREO PAN", "OUT / OUT", "ok"], ["✓", "LEVEL", "on U", "ok"]];
+  if (r && r.level) facts.push(["•", "Last reading", `peaks ${r.level.peak_p90} dBFS · ${r.level.loudness} LUFS · ${mixerChanges(r).length} change(s) suggested`, mixerChanges(r).length ? "change" : "ok"]);
+  $(".strip-wrap", wrap).append(instrList(facts));
 
-  if (m.step === 1) {
-    wrap.append(el("div", { class: "step-title", text: "Set channel 1 to this starting position" }),
-      el("p", { class: "step-help", text: "Mic plugged into Mic/Line 1. Set every control on that strip as shown, top to bottom." }));
-    const items = [
-      ["1", "GAIN", "About 9 o'clock for now — you'll set it in step 2.", "change"],
-      ["2", "LOW CUT", "IN (pressed). Removes rumble below 100 Hz.", "change"],
-      ["3", "HI", "12 o'clock — the centre click (flat).", "change"],
-      ["4", "LOW", "12 o'clock — the centre click (flat).", "change"],
-      ["5", "FX", "OUT — no reverb on a voice.", "change"],
-      ["6", "STEREO PAN", "OUT — when IN, channel 1 only plays on the left.", "change"],
-      ["7", "LEVEL", "On the U mark (unity).", "change"],
-    ];
-    const badges = { gain: 1, low_cut: 2, hi: 3, low: 4, fx: 5, stereo_pan: 6, level: 7 };
-    wrap.append(el("div", { class: "strip-wrap", html: stripSvg({ low_cut: true, hi: 0, low: 0, fx: false, stereo_pan: false }, null, badges) }));
-    $(".strip-wrap", wrap).append(instrList(items));
-    wrap.append(el("p", { class: "step-help", html: "Master section: <b>48V</b> on only for a condenser mic (off for dynamic mics like the SM7B). <b>MAIN MIX</b> and <b>PHONES</b> don't change the recording — set them for comfortable monitoring." }));
-    const next = el("button", { class: "btn btn-accent", text: "Done — next" });
-    next.addEventListener("click", async () => { try { m.state = await send("mixer_state", MIXER_BASELINE); } catch {} m.report = null; m.step = 2; renderTabs(true); });
-    wrap.append(next);
-  }
-
-  if (m.step === 2) {
-    wrap.append(el("div", { class: "step-title", text: "Set GAIN while you talk" }),
-      el("p", { class: "step-help", text: "Sit where you'll record, at your normal distance from the mic. Talk at recording volume and turn the GAIN knob slowly as the arrow says. The bottom bar shows the same hint, so you can watch it from the chair." }));
-    wrap.append(el("div", { class: "gain-live", id: "gainLive" }, el("div", { class: "arrow", text: "…" }), el("div", {}, el("div", { class: "big", text: "" }), el("div", { class: "small", text: "" }))));
-    const cur2 = Object.assign({}, cur, { fx: false, stereo_pan: false });
-    const dir = S.audio && S.audio.gain_hint ? S.audio.gain_hint.action : null;
-    wrap.append(el("div", { class: "strip-wrap", html: stripSvg(cur2, { gain_dir: dir }, { gain: 1 }) }));
-    $(".strip-wrap", wrap).append(instrList([["1", "GAIN", "Clockwise = louder. Aim: the level-set LED only flickers on your loudest words, and the arrow turns green.", "change"]]));
-    const next = el("button", { class: "btn btn-accent", text: "Level is right — next" });
-    next.addEventListener("click", () => { m.step = 3; renderTabs(true); });
-    wrap.append(next);
-  }
-
-  if (m.step === 3 || m.step === 4) {
-    const verify = m.step === 4;
-    wrap.append(el("div", { class: "step-title", text: verify ? "Check the new settings" : "Analyse your voice" }),
-      el("p", { class: "step-help", text: verify ? "Talk again for 15 seconds to confirm the mixer changes worked." : "Press the button and talk for 15 seconds, exactly as you will on camera. The app works out the LOW CUT / HI / LOW settings for a podcast-style voice and the settings for your recording software." }));
-    const go = el("button", { class: "btn btn-accent", text: m.busy ? "Listening…" : verify ? "Check again (15 s)" : "Start (15 s)" });
-    go.disabled = m.busy;
-    go.addEventListener("click", () => runMixerCheck(go));
-    wrap.append(el("div", { class: "btn-row", style: "padding:0 0 8px" }, go, el("span", { id: "checkCountdown", class: "step-help", style: "margin:0" })));
-    const r = m.report;
-    if (r && r.error) wrap.append(el("p", { class: "step-help", style: "color:var(--bad)", text: r.error }));
-    if (r && !r.error) {
-      const changes = mixerChanges(r);
-      const target = { gain_dir: r.controls.gain.action === "ok" ? null : r.controls.gain.action, low_cut: r.recommended.low_cut, hi: r.recommended.hi, low: r.recommended.low, stereo_pan: false, fx: false };
-      const badges = {};
-      changes.forEach(([k], i) => (badges[k] = i + 1));
-      wrap.append(el("div", { class: "step-help", text: `Heard ${r.speech_seconds} s of speech · loudness ${r.loudness} LUFS · peaks ${r.peak_p90} dBFS${r.balance && Math.abs(r.balance) > 3 ? ` · ${Math.abs(r.balance).toFixed(0)} dB off-centre` : ""}.` }));
-      wrap.append(el("div", { class: "strip-wrap", html: stripSvg({ ...(r.current || cur), fx: false, stereo_pan: r.controls.stereo_pan.action !== "ok" }, target, badges) }));
-      const items = changes.length
-        ? changes.map(([k, ctl, txt], i) => [String(i + 1), ctl, txt, "change"])
-        : [["✓", "Mixer", "Nothing to change — your channel is set.", "ok"]];
-      if (changes.length) {
-        for (const [k, ctl] of [["gain", "GAIN"], ["low_cut", "LOW CUT"], ["hi", "HI"], ["low", "LOW"], ["stereo_pan", "STEREO PAN"]])
-          if (!badges[k]) items.push(["✓", ctl, r.controls[k].text, "ok"]);
-      }
-      items.push(["✓", "FX / LEVEL", "FX OUT, LEVEL on U.", "ok"]);
-      $(".strip-wrap", wrap).append(instrList(items));
-      if (changes.length) {
-        const applied = el("button", { class: "btn btn-accent", text: "I've made these changes" });
-        applied.addEventListener("click", async () => {
-          try { m.state = await send("mixer_state", { low_cut: r.recommended.low_cut, low: r.recommended.low, hi: r.recommended.hi }); } catch {}
-          m.applied = true; m.step = 4; m.report = null; renderTabs(true); renderAll(false);
-        });
-        wrap.append(el("div", { class: "btn-row", style: "padding:8px 0" }, applied));
-      } else if (verify) {
-        m.applied = true;
-        wrap.append(el("p", { class: "step-help", style: "color:var(--ok);font-weight:600", text: "Your mixer is set. Add the software filters below and you're ready to record." }));
-      }
-      if (r.notes && r.notes.length) { const ul = el("ul", { class: "notes" }); r.notes.forEach((n) => ul.append(el("li", { text: n }))); wrap.append(el("div", { class: "step-help", style: "margin:8px 0 0;color:var(--text)", text: "Things the mixer can't fix:" }), ul); }
-      wrap.append(el("div", { html: toneChart(r.tone) }));
-      wrap.append(softwareBox(r.software));
-    }
-  }
-
-  // reference voice
-  const refRow = el("div", { class: "ref-row" }, el("span", { id: "refName", text: "Tone target: …" }));
+  const refRow = el("div", { class: "ref-row" }, el("span", { id: "refName", text: "Tone ranges: …" }));
   const up = el("input", { type: "file", accept: "audio/*,video/*", style: "display:none" });
-  const upBtn = el("button", { class: "btn btn-sm", text: "Match a voice I like…", title: "Upload a clip of a podcast/YouTube voice you like (MP3, WAV, M4A or video). Its tone becomes the target." });
-  const clrBtn = el("button", { class: "btn btn-sm", text: "Use built-in target" });
+  const upBtn = el("button", { class: "btn btn-sm", text: "Match a voice I like…", title: "Upload a clip of a podcast/YouTube voice you like (MP3, WAV, M4A or video). Its tone becomes the target range." });
+  const clrBtn = el("button", { class: "btn btn-sm", text: "Use typical ranges" });
   upBtn.addEventListener("click", () => up.click());
   up.addEventListener("change", async () => {
     const f = up.files[0]; if (!f) return;
     toast(`Analysing ${f.name}…`);
     const res = await fetch(`/api/voice-reference?name=${encodeURIComponent(f.name)}`, { method: "POST", body: f }).then((x) => x.json()).catch(() => ({ ok: false, error: "Upload failed" }));
-    res.ok ? toast(`Tone target: ${f.name} (${res.speech_seconds} s of speech). Run the analysis again.`, "ok") : toast(res.error, "error");
+    res.ok ? toast(`Target: ${f.name} (${res.speech_seconds} s of speech). Run the wizard again.`, "ok") : toast(res.error, "error");
     refreshRefName();
   });
   clrBtn.addEventListener("click", () => run("voice_reference", "clear").then(refreshRefName).catch(() => {}));
@@ -1616,10 +1491,15 @@ function renderAudioTab(body) {
   wrap.append(refRow);
   body.append(wrap);
   refreshRefName();
-  renderAudioLevels();
+}
+function mixerClock(db) {
+  db = Number(db) || 0;
+  if (Math.abs(db) < 0.75) return "12 o'clock (flat)";
+  const h = 12 + db / 3, hh = ((Math.round(h * 2) / 2 - 1) % 12) + 1;
+  return `${Number.isInteger(hh) ? hh : Math.floor(hh) + ":30"} o'clock (${db > 0 ? "+" : ""}${db} dB)`;
 }
 function refreshRefName() {
-  send("voice_reference").then((r) => { const n = $("#refName"); if (n) n.textContent = `Tone target: ${r.target}`; }).catch(() => {});
+  send("voice_reference").then((r) => { const n = $("#refName"); if (n) n.textContent = `Tone ranges: ${r.target}`; }).catch(() => {});
 }
 
 function expandCard(id) {
