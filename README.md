@@ -93,7 +93,7 @@ These cover loudness calibration against the BS.1770 reference, the live GAIN hi
 
 - **Starting a recording from the PC needs ApplicationMode.** The D7500 refuses `StartMovieRecInCard` (blocker bit 14, "not in application mode") unless ApplicationMode (`0xD1F0`) is set to 1 *with live view off*, before live view starts. It resets when the USB session closes, and writing it while live view runs hangs the connection. The app now does this automatically; the lead came from [gphoto2 issue #531](https://github.com/gphoto/gphoto2/issues/531), where a D7500 records with `gphoto2 --set-config movie=1`. *Not yet confirmed with a recorded clip: the camera battery was flat.*
 - The 1080p/720p frame-rate labels follow the D850 table in libgphoto2. The 4K vs full-width grouping is verified on the camera; the individual frame rates are not.
-- Live view drains the battery quickly. Use the mains adapter for long sessions.
+- Live view drains the battery quickly. Use mains power for long sessions, but beware **cheap EN-EL15 dummy batteries**. Their "decoder" chip pretends to be a battery: it starts at a fixed level (40% here), counts down while the camera draws power, and at ~1% the camera reports *battery exhausted* and refuses live view and recording (LV prohibit bit 8), which also stops the HDMI feed. Power-cycling the adapter resets it. The camera reports AC power = 0 with such couplers. Nikon's EP-5B + EH-5c/EH-5d, or a "fully decoded" dummy that always reports full, avoids this.
 
 ## How it works
 

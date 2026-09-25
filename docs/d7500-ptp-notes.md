@@ -74,3 +74,8 @@ Big-endian. The JPEG starts at the first `FF D8 FF`.
 ## HDMI
 
 The D7500 exposes no HDMI properties over PTP: `0xD0CC` HDMIOutputDataDepth is absent from its property list. Output resolution, the on-screen display and the output range can only be set in the camera menu.
+
+## Power
+
+- Only two power properties: `0x5001` battery level (range 1–100) and `0xD101` AC power.
+- With a third-party EN-EL15 dummy battery on mains power, the camera still reports AC power = 0. The level comes from the dummy's emulated fuel gauge: 40% after power-up, then counting down over ~1–3 h of live view. At 1% the camera sets LV prohibit bit 8 (battery exhausted) and `StartLiveView` answers `0xA004` Invalid Status. Power-cycling the adapter resets it to 40%.
