@@ -239,7 +239,7 @@ MOVIE_PROHIBIT_BITS = {
     11: "Card is write-protected",
     12: "Preview is zoomed in",
     13: "Live view is in photo mode",
-    14: "The D7500 only starts recording from its own record button",
+    14: "Camera not in application mode (the app sets it when live view starts)",
 }
 
 LV_PROHIBIT_BITS = {

@@ -117,9 +117,10 @@ function fmtClock(sec) {
    Property helpers
    ====================================================================== */
 const UNSAFE_CODES = new Set([0xd1f0]);
-const BODY_ONLY = "The D7500 only starts recording from its own record button";
-const recBlockers = () => (S.status.movie_prohibit || []).filter((r) => r !== BODY_ONLY);
-const bodyOnlyRecording = () => (S.status.movie_prohibit || []).includes(BODY_ONLY);
+// Bit 14 ("not in application mode") is fixed by the app itself when you press REC.
+const APP_MODE_MSG = "Camera not in application mode (the app sets it when live view starts)";
+const recBlockers = () => (S.status.movie_prohibit || []).filter((r) => r !== APP_MODE_MSG);
+const bodyOnlyRecording = () => false;
 const P = (key) => { const s = S.byKey[key]; return s ? S.props[s.code] : undefined; };
 const V = (key) => { const p = P(key); return p ? p.v : undefined; };
 const isMovie = () => V("lv_selector") === 1;

@@ -42,7 +42,7 @@ log = logging.getLogger("nikon_remote.camera")
 
 RC_NotLiveView = 0xA00B
 REC_BIT = 1 << 10  # MovRecProhibitCondition: "already recording"
-BODY_ONLY_BIT = 1 << 14  # set whenever the PC runs live view; D7500 records only from its button
+BODY_ONLY_BIT = 1 << 14  # "not in application mode": set ApplicationMode=1 (live view off) to clear it
 RC_OutOfFocus = 0xA002
 RC_MfDriveStepEnd = 0xA00C
 # After an end stop the D7500 answers "step insufficiency" to further moves that way.
@@ -52,9 +52,12 @@ MF_LIMIT_CODES = (RC_MfDriveStepEnd, RC_MfDriveStepInsufficiency)
 CATALOG_CODES = [s.code for s in catalog.SETTINGS]
 PC_MODE_CODES = {s.code for s in catalog.SETTINGS if s.pc_mode}
 # Changing any of these can change which other settings are available.
-# Writing these hangs the D7500's USB connection for ~10 s (it answers
-# "access denied" much later), so the app never writes them.
-UNSAFE_CODES = {0xD1F0: "Application mode can't be changed on this camera"}
+# ApplicationMode (0xD1F0) must be 1 for the D7500 to start a movie from USB
+# (MovRecProhibitCondition bit 14 otherwise). The camera only accepts it with
+# live view OFF and resets it when the USB session closes; written while live
+# view runs it hangs the connection — so only the service sets it, never the UI.
+APPLICATION_MODE = 0xD1F0
+UNSAFE_CODES = {APPLICATION_MODE: "Set automatically by the app (the camera only accepts it with live view off)"}
 CASCADE_CODES = {0x500E, 0xD1A6, 0xD0A0, 0xD0AD, 0xD16A, 0xD061, 0xD05D}
 LV_ZOOM = 0xD1A3
 
@@ -123,6 +126,7 @@ class CameraService:
         self._last_emit = 0.0
         self._busy_since: float | None = None
         self._recoveries = 0
+        self.app_mode = False
 
         self._frame: Frame | None = None
         self._frame_lock = threading.Lock()
@@ -283,6 +287,9 @@ class CameraService:
             except Exception:
                 pass
         self.pc_mode = False
+        self.app_mode = False
+        if not lv_running:
+            self._ensure_app_mode()
         self._load_all_descs()
         info = cam.info
         self._set_status(
@@ -527,6 +534,20 @@ class CameraService:
             self._frame = Frame(self._seq, f.jpeg, f.header, time.time())
         self._emit("frame", self._seq)
 
+    def _ensure_app_mode(self) -> bool:
+        """Put the D7500 in application mode (needed to record from USB). Live view must be off."""
+        cam = self.cam
+        try:
+            if cam.get_prop(APPLICATION_MODE, 2) == 1:
+                self.app_mode = True
+                return True
+            cam.set_prop(APPLICATION_MODE, 1, 2, timeout=8000)
+            self.app_mode = cam.get_prop(APPLICATION_MODE, 2) == 1
+        except (PTPError, usb.core.USBTimeoutError) as e:
+            log.warning("couldn't set application mode: %s", e)
+            self.app_mode = False
+        return self.app_mode
+
     def _start_lv(self) -> None:
         cam = self.cam
         self._next_lv_try = time.monotonic() + 2.0
@@ -534,6 +555,8 @@ class CameraService:
             cond = cam.get_prop(0xD1A4, 6)
         except PTPError:
             cond = 0
+        if APPLICATION_MODE in self.descs and not self.app_mode:
+            self._ensure_app_mode()
         # bit 24 (lens retracting) is transient and harmless
         if cond & ~(1 << 24):
             reasons = catalog.decode_bits(cond, catalog.LV_PROHIBIT_BITS)
@@ -830,17 +853,28 @@ class CameraService:
                 self._start_lv()
                 if not self.lv_on:
                     raise UserError(self.status.get("lv_error") or "Live view isn't running")
+            prohibit = cam.get_prop(0xD0A4, 6)
+            if prohibit & BODY_ONLY_BIT and not self.recording:
+                # Not in application mode: it can only be set with live view off.
+                log.info("recording blocked by application mode — restarting live view in application mode")
+                self._end_lv()
+                time.sleep(1.0)
+                self.app_mode = False
+                self._ensure_app_mode()
+                self._next_lv_try = 0
+                self._start_lv()
+                if not self.lv_on:
+                    raise UserError(self.status.get("lv_error") or "Live view didn't restart")
+                time.sleep(0.5)
             # Let the camera decide; the prohibit bits only explain a refusal.
             try:
                 self._retry_busy(cam.start_movie)
             except PTPError as e:
                 prohibit = cam.get_prop(0xD0A4, 6)
                 if prohibit & ~BODY_ONLY_BIT == 0:
-                    # Verified on a D7500: it never starts a movie from USB, only
-                    # from its own button. The app then follows the take.
                     raise UserError(
-                        "The D7500 can't start recording from a computer. Press the red ● record button "
-                        "on the camera — the app shows the timer and keeps the preview running."
+                        "The camera refused to start recording even in application mode. Press the camera's "
+                        "● button as a fallback — the app follows the take."
                     ) from e
                 reasons = catalog.decode_bits(prohibit, catalog.MOVIE_PROHIBIT_BITS)
                 raise UserError("Can't record: " + ("; ".join(reasons) if reasons else str(e))) from e

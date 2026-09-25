@@ -408,8 +408,8 @@ class PTPCamera:
         data, _ = self.transaction(OC_GetDevicePropValue, [code], want_data=True)
         return _read_val(data, 0, dtype)[0]
 
-    def set_prop(self, code: int, value, dtype: int) -> None:
-        self.transaction(OC_SetDevicePropValue, [code], data_out=encode_val(value, dtype))
+    def set_prop(self, code: int, value, dtype: int, timeout: int = 5000) -> None:
+        self.transaction(OC_SetDevicePropValue, [code], data_out=encode_val(value, dtype), timeout=timeout)
 
     # -- Nikon operations ---------------------------------------------------
     def device_ready(self) -> int:

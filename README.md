@@ -54,7 +54,7 @@ Close Entangle, gphoto2 or anything else that might be using the camera first. O
 5. Make sure the **pre-flight check** is green. Reset the live view timer (⏱ chip) right before a long take.
 6. Record in your capture software (e.g. OBS at 1920×1080, 30 fps).
 
-If you record to the camera's card instead, switch **Setup → I record on → Camera card**. The D7500 only starts a card recording from its own ● button.
+If you record to the camera's card instead, switch **Setup → I record on → Camera card** and use the REC button (or the camera's ● button).
 
 ### Capture card notes (UGREEN 15390)
 
@@ -91,7 +91,7 @@ These cover loudness calibration against the BS.1770 reference, the live GAIN hi
 
 - **Live view turns off about 10 minutes after it starts** (with the current c3 setting), and the HDMI feed goes with it. Camera commands don't reset the timer; only restarting live view does. The app shows the countdown and has a one-click reset (1–2 s blackout).
 
-- **The PC can't start a recording.** The camera answers `InvalidStatus` to Nikon's `StartMovieRecInCard` whenever the PC runs live view: blocker bit 14, "not in application mode". The setting that should clear this (ApplicationMode, `0xD1F0`) is refused by the D7500. Every combination was tested: photo or movie Lv, PC-control mode on or off, the selector set before or after live view, and the shutter-release route. Start and stop takes with the camera's ● button.
+- **Starting a recording from the PC needs ApplicationMode.** The D7500 refuses `StartMovieRecInCard` (blocker bit 14, "not in application mode") unless ApplicationMode (`0xD1F0`) is set to 1 *with live view off*, before live view starts. It resets when the USB session closes, and writing it while live view runs hangs the connection. The app now does this automatically; the lead came from [gphoto2 issue #531](https://github.com/gphoto/gphoto2/issues/531), where a D7500 records with `gphoto2 --set-config movie=1`. *Not yet confirmed with a recorded clip: the camera battery was flat.*
 - The 1080p/720p frame-rate labels follow the D850 table in libgphoto2. The 4K vs full-width grouping is verified on the camera; the individual frame rates are not.
 - Live view drains the battery quickly. Use the mains adapter for long sessions.
 

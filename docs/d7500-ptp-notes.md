@@ -12,14 +12,16 @@ Everything here was measured on a D7500 (firmware 1.10, AF-S DX 18–140 lens) c
 
 ## Recording
 
-- `StartMovieRecInCard` (`0x920A`) and `EndMovieRec` (`0x920B`) are advertised, but start always returns `0xA004` InvalidStatus while the PC runs live view.
+- `StartMovieRecInCard` (`0x920A`) / `EndMovieRec` (`0x920B`) are advertised.
 - MovRecProhibitCondition `0xD0A4` bits:
-  - bit 13 = Lv selector on photo (clears when set to movie);
-  - bit 14 = set whenever the PC runs live view, in every mode combination tried; libgphoto2 calls it "not in application mode";
+  - bit 13 = Lv selector on photo;
+  - bit 14 = **not in application mode**;
   - bit 10 = already recording;
-  - bits 0–3 cover the card (none / error / unformatted / full).
-- With the Lv selector on movie, `InitiateCaptureRecInMedia` (`0x9207`) takes a **still photo**, even with MovieReleaseButton `0xD197` = 1.
-- The D7500's event list doesn't include MovieRecordStarted/Complete (`0xC10A`/`0xC108`). The app watches bit 10 instead.
+  - bits 0–3 cover the card.
+- **ApplicationMode `0xD1F0`** must be 1 to clear bit 14. It's accepted in ~200 ms **only with live view off** (fresh session). While live view runs, or after `ChangeCameraMode(1)`, the write is refused ~5 s later or hangs the session. It resets to 0 when the session closes. libgphoto2's `movie` config sets it the same way before starting live view; see [gphoto2 issue #531](https://github.com/gphoto/gphoto2/issues/531).
+- Tried and refused while ApplicationMode was 0: every combination of photo/movie Lv, PC-control mode on/off, and the selector set before or after live view.
+- With the Lv selector on movie, `InitiateCaptureRecInMedia` (`0x9207`) takes a still photo, even with MovieReleaseButton `0xD197` = 1.
+- The D7500 doesn't list MovieRecordStarted/Complete (`0xC10A`/`0xC108`) events. The app watches bit 10.
 
 ## Live view header (`GetLiveViewImg` 0x9203)
 
