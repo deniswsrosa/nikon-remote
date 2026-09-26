@@ -217,7 +217,6 @@ STATUS_CODES = {
     "battery": 0x5001,
     "remaining_shots": 0xD1F1,
     "meter": 0xD1B1,
-    "lv_status": 0xD1A2,
     "lv_prohibit": 0xD1A4,
     "movie_prohibit": 0xD0A4,
     "focal_length": 0x5008,
@@ -225,8 +224,6 @@ STATUS_CODES = {
     "focal_max": 0xD0E4,
     "ac_power": 0xD101,
     "af_lock": 0xD104,
-    "ae_lock": 0xD105,
-    "warning": 0xD102,
 }
 
 MOVIE_PROHIBIT_BITS = {

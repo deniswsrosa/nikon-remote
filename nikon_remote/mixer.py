@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 import pyloudnorm
 import webrtcvad
-from pedalboard import Compressor, Gain, HighpassFilter, HighShelfFilter, LowShelfFilter, Pedalboard
+from pedalboard import Compressor, Gain, HighShelfFilter, LowShelfFilter, Pedalboard
 
 RATE = 48000
 REFERENCE = Path.home() / ".config" / "nikon-remote" / "voice_reference.json"
@@ -89,12 +89,6 @@ def third_octave_spectrum(mono: np.ndarray) -> np.ndarray:
         sel = (freqs >= lo) & (freqs < hi)
         out.append(10 * np.log10(spec[sel].sum() + 1e-15))
     return np.array(out)
-
-
-def _normalise(levels: np.ndarray) -> np.ndarray:
-    """0 dB at the 500 Hz–2 kHz average, so comparisons ignore overall level."""
-    mids = [i for i, f in enumerate(THIRD_OCTAVES) if 500 <= f <= 2000]
-    return levels - levels[mids].mean()
 
 
 def save_reference_from_file(path: str, name: str) -> dict:
