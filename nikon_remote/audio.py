@@ -78,7 +78,6 @@ class AudioMonitor:
         self._capture_blocks = 0  # how many 100 ms blocks the running voice check wants
         self._capture_future: Future | None = None
         self._clip_until = 0.0
-        self.enabled = True
         self.last: dict = {}
         self._speech_peaks: deque = deque(maxlen=100)  # last 10 s of speech, 100 ms peaks
         self._hint = "talk"

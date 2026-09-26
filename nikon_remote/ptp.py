@@ -19,11 +19,7 @@ NIKON_VENDOR_ID = 0x04B0
 OC_GetDeviceInfo = 0x1001
 OC_OpenSession = 0x1002
 OC_CloseSession = 0x1003
-OC_GetStorageIDs = 0x1004
-OC_GetStorageInfo = 0x1005
 OC_GetObjectInfo = 0x1008
-OC_GetObject = 0x1009
-OC_DeleteObject = 0x100B
 OC_GetDevicePropDesc = 0x1014
 OC_GetDevicePropValue = 0x1015
 OC_SetDevicePropValue = 0x1016
@@ -310,7 +306,6 @@ class PTPCamera:
         self.intf = intf
         self.ep_out = ep(usb.util.ENDPOINT_OUT, usb.util.ENDPOINT_TYPE_BULK)
         self.ep_in = ep(usb.util.ENDPOINT_IN, usb.util.ENDPOINT_TYPE_BULK)
-        self.packet = self.ep_in.wMaxPacketSize
         self._drain()
         self._tid = 0
         try:
@@ -456,16 +451,6 @@ class PTPCamera:
         data, _ = self.transaction(OC_NIKON_GetLiveViewImg, want_data=True)
         return parse_liveview(data)
 
-    def autofocus(self, timeout_s: float = 6.0) -> bool:
-        """Run AF; True if focus was achieved."""
-        self.transaction(OC_NIKON_AfDrive)
-        rc = self.wait_ready(timeout_s)
-        if rc == RC_OK:
-            return True
-        if rc == 0xA002:
-            return False
-        raise PTPError(rc, OC_NIKON_AfDrive)
-
     def cancel_af(self) -> None:
         """Abort a focus drive. The D7500 can get stuck mid-AF (every command answers
         "busy", even in a new session); this frees it immediately."""
@@ -476,14 +461,6 @@ class PTPCamera:
 
     def change_af_area(self, x: int, y: int) -> None:
         self.transaction(OC_NIKON_ChangeAfArea, [int(x), int(y)])
-
-    def manual_focus(self, steps: int) -> None:
-        """Positive steps move focus towards infinity, negative towards near."""
-        direction = 2 if steps >= 0 else 1
-        self.transaction(OC_NIKON_MfDrive, [direction, max(1, abs(int(steps)))])
-        rc = self.wait_ready(5.0)
-        if rc not in (RC_OK,):
-            raise PTPError(rc, OC_NIKON_MfDrive)
 
     def start_movie(self) -> None:
         self.transaction(OC_NIKON_StartMovieRecInCard)
@@ -503,9 +480,3 @@ class PTPCamera:
         filename, off = _read_str(data, off)
         return {"handle": handle, "storage": storage, "format": fmt, "size": size, "filename": filename}
 
-    def get_object(self, handle: int, timeout: int = 120000) -> bytes:
-        data, _ = self.transaction(OC_GetObject, [handle], want_data=True, timeout=timeout)
-        return data
-
-    def delete_object(self, handle: int) -> None:
-        self.transaction(OC_DeleteObject, [handle])
