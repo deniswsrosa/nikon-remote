@@ -171,7 +171,6 @@ select:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
 .rec-btn.on { background: var(--rec); border-color: var(--rec); }
 .rec-btn.on .rec-core { border-radius: 6px; width: 24px; height: 24px; background: #fff; }
 .rec-btn.on .rec-label { color: #fff; }
-.rec-btn.body-only .rec-label { font-size: 10px; letter-spacing: .5px; }
 .rec-btn:disabled { opacity: .45; cursor: not-allowed; }
 
 .dials { flex: 1; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; min-width: 0; }

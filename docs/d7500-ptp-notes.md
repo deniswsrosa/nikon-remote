@@ -8,7 +8,7 @@ Everything here was measured on a D7500 (firmware 1.10, AF-S DX 18–140 lens) c
 - **While live view runs**, even in normal camera mode, these become writable: `0x500E` exposure program (P/S/A/M, whatever the physical dial says), `0xD1A6` Lv selector (0 photo, 1 movie) and `0xD1A5` exposure preview.
 - The Lv selector reverts to the **physical switch** whenever live view restarts.
 - `ChangeCameraMode(1)` (`0x90C2`), PC-control mode, makes the above writable even without live view. It doesn't make recording possible.
-- Writing **ApplicationMode `0xD1F0` is refused.** The camera answers *Access denied* about 5 s later, which breaks a short USB timeout and desynchronises the session. Never write it.
+- **ApplicationMode `0xD1F0`** must be written with live view off (see Recording). Writing it while live view runs is refused ~5 s later (*Access denied*) or hangs the session.
 
 ## Recording
 

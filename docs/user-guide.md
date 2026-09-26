@@ -9,7 +9,7 @@ The same guide is built into the app (the **Guide** button in the top bar).
 3. **Sit in position**, then press **Focus on my eyes** and **Expose for my face** (Face check panel).
 4. **Mixer:** Audio tab → follow the 4 steps (start position, GAIN, analyse, check).
 5. **Check the pre-flight panel.** Everything green (or understood) means you're good. Right before a long take, click the **⏱ LV** chip to reset the camera's live view timer.
-6. **Record** in your capture software. (Recording to the camera's card? Setup → *I record on* → Camera card, then use the camera's ● button.)
+6. **Record.** HDMI capture: start in your capture software. Camera card: Setup → *I record on* → Camera card, then press **REC** (or **R**) in the app.
 
 ## Face check
 
@@ -63,7 +63,7 @@ Why the LOW knob stays at 12 o'clock: on the ProFX6v3 it's an 80 Hz shelf. With 
 
 - **Top bar:** connection, exposure mode, Photo/Movie live view, frame size and rate, battery, card, Guide, shortcuts, fullscreen.
 - **Preview:** click to focus (Shift+click moves the focus box without focusing). Top right shows the camera's exposure meter.
-- **Under the preview:** the REC button (it reads *ON CAMERA* when the camera has to start the take itself), the exposure dials, the focus bar and overlay toggles. These are the only place these settings appear.
+- **Under the preview:** the REC button, the exposure dials, the focus bar and overlay toggles. These are the only place these settings appear.
 - **Right panel:** pre-flight check, presets, and tabs with all the other settings. Every ⓘ explains its setting.
 
 ## Exposure settings
@@ -119,7 +119,6 @@ Why the LOW knob stays at 12 o'clock: on the ProFX6v3 it's an 80 Hz shelf. With 
 | "Camera not connected" | Turn the camera on and wake it (half-press the shutter). Use a USB **data** cable plugged straight into the PC. Close Entangle and gphoto2. |
 | "Camera is busy (another app is using it)" | Another program, usually Entangle or a file manager window showing the camera, holds the USB device. Close it. |
 | "Live view blocked: Battery exhausted" | Charge or swap the battery. |
-| REC shows *ON CAMERA* | Normal on the D7500 when recording to the card: start the take with the camera's ● button. |
 | Capture card shows black | Turn off *HDMI → Advanced → Live view on-screen display* if the picture has overlays; make sure live view is running (the app starts it); check the ⏱ timer hasn't expired. |
 | Audio analysis says "Almost no signal" | Mic in Mic/Line 1, 48V on for condenser mics, channel LEVEL on U, and the right input selected in the Audio tab. |
 | Preview is black in Photo mode | Exposure preview is on and the scene is dark. Use the *Show brightened preview* button, or add light. |
