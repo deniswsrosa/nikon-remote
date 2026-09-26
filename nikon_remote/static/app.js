@@ -120,7 +120,6 @@ const UNSAFE_CODES = new Set([0xd1f0]);
 // Bit 14 ("not in application mode") is fixed by the app itself when you press REC.
 const APP_MODE_MSG = "Camera not in application mode (the app sets it when live view starts)";
 const recBlockers = () => (S.status.movie_prohibit || []).filter((r) => r !== APP_MODE_MSG);
-const bodyOnlyRecording = () => false;
 const P = (key) => { const s = S.byKey[key]; return s ? S.props[s.code] : undefined; };
 const V = (key) => { const p = P(key); return p ? p.v : undefined; };
 const isMovie = () => V("lv_selector") === 1;
@@ -617,9 +616,7 @@ function renderTopbar() {
   }
   const rec = !!st.recording;
   $("#recBtn").classList.toggle("on", rec);
-  const bodyOnly = !rec && bodyOnlyRecording() && !recBlockers().length;
-  $("#recLabel").textContent = rec ? fmtClock(st.rec_elapsed || 0) : bodyOnly ? "ON CAMERA" : "REC";
-  $("#recBtn").classList.toggle("body-only", bodyOnly);
+  $("#recLabel").textContent = rec ? fmtClock(st.rec_elapsed || 0) : "REC";
   $("#recBadge").hidden = !rec;
   $("#recTime").textContent = fmtClock(st.rec_elapsed || 0);
   const left = S.header && S.header.clip_remaining_ms;
@@ -628,7 +625,6 @@ function renderTopbar() {
   $("#recBtn").disabled = !st.connected || (!rec && !isMovie());
   $("#recBtn").title = !isMovie() ? "Switch live view to Movie to record"
     : rec ? "Stop recording (R)"
-    : bodyOnly ? "Press the red ● record button on the camera to start — the D7500 doesn't allow starting from a computer. The timer appears here."
     : "Start recording (R)";
 
   renderMeter();
@@ -756,7 +752,7 @@ function lockReason(s) {
     return `Controlled by the camera in ${fmtValue(S.byKey.mode, mode)} mode — switch to M (click the Mode chip at the top).`;
   if (s.key.endsWith("iso") && (V(isMovie() ? "movie_auto_iso" : "auto_iso") === 1)) return "Auto ISO is on — the camera sets ISO itself.";
   if (s.pc_mode && !S.status.lv) return "Can be changed from here while live view is running.";
-  if (UNSAFE_CODES.has(s.code)) return "Changing this makes the D7500 stop responding, so the app doesn't allow it.";
+  if (UNSAFE_CODES.has(s.code)) return "Set automatically by the app — the camera only accepts it with live view off.";
   if (s.scope === "movie" && !isMovie()) return "Movie setting — switch live view to Movie to change it.";
   if (s.scope === "photo" && isMovie()) return "Photo setting — switch live view to Photo to change it.";
   if (S.status.recording) return "Can't be changed while recording.";
@@ -932,7 +928,6 @@ function computeChecks() {
 
   if (movie && !st.recording && !onPc) {
     if (recBlockers().length) add("bad", "Recording is blocked", recBlockers().join(" · "));
-    else if (bodyOnlyRecording()) add("ok", "Ready — start with the camera's ● button", "The D7500 doesn't let a computer start a take. The app shows the timer and keeps the preview running.");
     else add("ok", "Ready to record");
   } else if (st.recording) add("ok", "Recording");
 
@@ -1379,11 +1374,6 @@ function renderAudioLevels() {
   if (typeof wizAudio === "function") wizAudio(a);
 }
 $("#audioBar").addEventListener("click", () => wizardOpen());
-
-function openAudioTab() {
-  S.ui.tab = "audio"; savePrefs(); renderTabs(true);
-  $("#tabs").scrollIntoView({ behavior: "smooth", block: "start" });
-}
 
 let audioSources = { sources: [], current: null };
 async function loadAudioSources() {
