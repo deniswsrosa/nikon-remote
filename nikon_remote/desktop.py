@@ -21,10 +21,7 @@ from pathlib import Path
 
 import uvicorn
 
-from .assist import Assist
-from .audio import AudioMonitor
-from .camera import CameraService
-from .server import create_app
+from .runtime import build_runtime
 
 PORT = 8765
 BROWSERS = ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "brave-browser", "microsoft-edge"]
@@ -78,13 +75,8 @@ def main() -> None:
             webbrowser.open(url)
         return
 
-    service = CameraService()
-    service.start()
-    assist = Assist(service)
-    assist.start()
-    audio = AudioMonitor(service._emit)
-    audio.start()
-    server = uvicorn.Server(uvicorn.Config(create_app(service, assist, audio), host="127.0.0.1", port=PORT, log_level="warning"))
+    runtime = build_runtime()
+    server = uvicorn.Server(uvicorn.Config(runtime.app, host="127.0.0.1", port=PORT, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     for _ in range(100):
@@ -105,9 +97,7 @@ def main() -> None:
     finally:
         server.should_exit = True
         thread.join(timeout=5)
-        audio.stop()
-        assist.stop()
-        service.stop()
+        runtime.stop()
         os._exit(0)
 
 
