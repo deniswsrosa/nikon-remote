@@ -9,10 +9,7 @@ import webbrowser
 
 import uvicorn
 
-from .assist import Assist
-from .audio import AudioMonitor
-from .camera import CameraService
-from .server import create_app
+from .runtime import build_runtime
 
 
 def main() -> None:
@@ -31,24 +28,16 @@ def main() -> None:
         level=logging.DEBUG if args.debug else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    service = CameraService()
-    service.start()
-    assist = Assist(service)
-    assist.start()
-    audio = AudioMonitor(service._emit)
-    audio.start()
-    app = create_app(service, assist, audio)
+    runtime = build_runtime()
     host = "0.0.0.0" if args.lan else "127.0.0.1"
     url = f"http://127.0.0.1:{args.port}/"
     if not args.no_browser:
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
     print(f"Nikon Remote running at {url}" + ("  (also reachable from your LAN)" if args.lan else ""))
     try:
-        uvicorn.run(app, host=host, port=args.port, log_level="warning")
+        uvicorn.run(runtime.app, host=host, port=args.port, log_level="warning")
     finally:
-        audio.stop()
-        assist.stop()
-        service.stop()
+        runtime.stop()
 
 
 if __name__ == "__main__":
