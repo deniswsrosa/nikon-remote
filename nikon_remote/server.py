@@ -32,7 +32,6 @@ STATIC = Path(__file__).parent / "static"
 ALLOWED_COMMANDS = {
     "set",
     "pc_mode",
-    "liveview",
     "focus_at",
     "autofocus",
     "manual_focus",
