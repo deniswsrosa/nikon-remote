@@ -111,7 +111,6 @@ class CameraService:
         self._thread: threading.Thread | None = None
 
         self.viewers = 0
-        self.want_lv = True
         self.lv_on = False
         self.pc_mode = False
         self.recording = False
@@ -477,7 +476,7 @@ class CameraService:
     # -- live view ---------------------------------------------------------
     def _tick_liveview(self) -> None:
         cam = self.cam
-        want = self.want_lv and (self.viewers > 0 or self.recording)
+        want = self.viewers > 0 or self.recording
         now = time.monotonic()
         if not want:
             if self.lv_on and not self.recording:
@@ -779,14 +778,6 @@ class CameraService:
         else:
             self._disable_pc_mode()
         return {"pc_mode": self.pc_mode}
-
-    def _cmd_liveview(self, fut, on: bool):
-        self.want_lv = bool(on)
-        if not on and self.lv_on and not self.recording:
-            self._end_lv()
-        if on:
-            self._next_lv_try = 0
-        return {"lv": self.want_lv}
 
     def _frame_to_sensor(self, fx: float, fy: float) -> tuple[int, int]:
         frame = self.latest_frame()
