@@ -174,6 +174,9 @@ class CameraService:
     def add_listener(self, fn: Callable[[str, object], None]) -> None:
         self._listeners.append(fn)
 
+    def remove_listener(self, fn: Callable[[str, object], None]) -> None:
+        self._listeners.remove(fn)
+
     def latest_frame(self) -> Frame | None:
         with self._frame_lock:
             return self._frame

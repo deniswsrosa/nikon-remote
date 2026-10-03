@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import struct
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import tempfile
@@ -66,10 +67,19 @@ class Hub:
         self.service = service
         self.clients: set[Client] = set()
         self.loop: asyncio.AbstractEventLoop | None = None
+        self._listener = None
 
     def attach(self, loop: asyncio.AbstractEventLoop) -> None:
+        self.detach()
         self.loop = loop
-        self.service.add_listener(lambda kind, payload: loop.call_soon_threadsafe(self._dispatch, kind, payload))
+        self._listener = lambda kind, payload: loop.call_soon_threadsafe(self._dispatch, kind, payload)
+        self.service.add_listener(self._listener)
+
+    def detach(self) -> None:
+        if self._listener is not None:
+            self.service.remove_listener(self._listener)
+            self._listener = None
+        self.loop = None
 
     def _dispatch(self, kind: str, payload) -> None:
         if kind == "frame":
@@ -82,21 +92,24 @@ class Hub:
 
 
 def create_app(service: CameraService, assist: Assist | None = None, audio: AudioMonitor | None = None) -> FastAPI:
-    app = FastAPI(title="Nikon Remote")
     hub = Hub(service)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        hub.attach(asyncio.get_running_loop())
+        try:
+            yield
+        finally:
+            hub.detach()
+
+    app = FastAPI(title="Nikon Remote", lifespan=lifespan)
     latest = {"face": None, "audio": None, "session": None}
-    if audio is not None:
-        audio._emit = service._emit  # audio levels go out through the same hub
 
     def remember(kind, payload):
         if kind in latest:
             latest[kind] = payload
 
     service.add_listener(remember)
-
-    @app.on_event("startup")
-    async def _startup():
-        hub.attach(asyncio.get_running_loop())
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
