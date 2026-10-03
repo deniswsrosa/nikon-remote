@@ -31,7 +31,7 @@ def build_runtime() -> Runtime:
     service.start()
     assist = Assist(service)
     assist.start()
-    # Keep CameraService._emit internal: entrypoints never assign audio._emit = service._emit.
+    # Constructor injection is the sole wiring for audio events.
     audio = AudioMonitor(service._emit)
     audio.start()
     return Runtime(service=service, assist=assist, audio=audio, app=create_app(service, assist, audio))
