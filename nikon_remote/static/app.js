@@ -15,7 +15,7 @@ const S = {
   audio: {},              // latest audio levels
   session: {},            // battery/disk estimates
   assist: null,           // assistant settings (face target, record folder, ...)
-  mixer: { step: 1, report: null, state: null, applied: false, busy: false },
+  mixer: { report: null, state: null, applied: false },
   frameSize: { w: 640, h: 424 },
   af: { state: "idle", until: 0 },
   pending: {},            // code -> value being set (optimistic UI)
@@ -910,8 +910,8 @@ function computeChecks() {
       if (!r) add("warn", "Mic not set up yet", "Run the mic setup wizard (about 5 minutes).", { label: "Start", run: () => wizardOpen() });
       else if (r.error) add("bad", "Voice check found a problem", r.error, { label: "Open", run: () => wizardOpen() });
       else {
-        const todo = mixerChanges(r).length;
-        if (todo && !S.mixer.applied) add("warn", `Mixer: ${todo} change${todo > 1 ? "s" : ""} to make`, "See the Audio tab.", { label: "Open", run: () => wizardOpen() });
+        const todo = (r.steps || []).length;
+        if (todo && !S.mixer.applied) add("warn", `Mixer: ${todo} change${todo > 1 ? "s" : ""} to make`, "Open the mic setup wizard.", { label: "Open", run: () => wizardOpen() });
         else add("ok", "Mixer checked");
       }
     }
@@ -1363,15 +1363,7 @@ function renderAudioLevels() {
   hint.textContent = a.checking ? `Keep talking… ${Math.ceil(a.check_left)} s` : h.text;
   hint.className = "ab-hint " + (a.checking ? "warn" : h.cls);
   $("#audioBar").classList.toggle("clip", !!a.clipping);
-  // live coach in the Audio tab, if it's open
-  const live = $("#gainLive");
-  if (live) {
-    live.className = "gain-live " + (h.cls === "ok" ? "ok" : a.gain_hint && a.gain_hint.action !== "talk" ? a.gain_hint.action : "");
-    $(".arrow", live).textContent = h.arrow;
-    $(".big", live).textContent = h.big;
-    $(".small", live).textContent = h.small;
-  }
-  if (typeof wizAudio === "function") wizAudio(a);
+  wizAudio(a);
 }
 $("#audioBar").addEventListener("click", () => wizardOpen());
 
@@ -1431,11 +1423,6 @@ function stripSvg(cur, target, badges = {}) {
   return g + `</svg>`;
 }
 
-// changes the latest analysis asks for
-function mixerChanges(r) {
-  return r && r.steps ? r.steps : [];
-}
-
 function instrList(items) {
   const ul = el("ul", { class: "instr" });
   items.forEach(([n, ctl, txt, state]) => ul.append(el("li", { class: state }, el("span", { class: "num", text: n }), el("div", {}, el("span", { class: "ctl", text: ctl }), el("span", { class: "txt", text: txt })))));
@@ -1462,7 +1449,7 @@ function renderAudioTab(body) {
   wrap.append(el("div", { class: "group-title", text: "Channel 1 as set by the wizard" }),
     el("div", { class: "strip-wrap", html: stripSvg({ ...st, fx: false, stereo_pan: false }, null, {}) }));
   const facts = [["✓", "LOW CUT", st.low_cut ? "IN" : "OUT", "ok"], ["✓", "HI", mixerClock(st.hi), "ok"], ["✓", "LOW", mixerClock(st.low), "ok"], ["✓", "FX / STEREO PAN", "OUT / OUT", "ok"], ["✓", "LEVEL", "on U", "ok"]];
-  if (r && r.level) facts.push(["•", "Last reading", `peaks ${r.level.peak_p90} dBFS · ${r.level.loudness} LUFS · ${mixerChanges(r).length} change(s) suggested`, mixerChanges(r).length ? "change" : "ok"]);
+  if (r && r.level) facts.push(["•", "Last reading", `peaks ${r.level.peak_p90} dBFS · ${r.level.loudness} LUFS · ${(r.steps || []).length} change(s) suggested`, (r.steps || []).length ? "change" : "ok"]);
   $(".strip-wrap", wrap).append(instrList(facts));
 
   const refRow = el("div", { class: "ref-row" }, el("span", { id: "refName", text: "Tone ranges: …" }));
