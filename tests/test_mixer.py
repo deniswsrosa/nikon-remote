@@ -10,7 +10,7 @@ FLAT = {"low_cut": True, "low": 0.0, "hi": 0.0}
 
 
 def blocks_of(stereo):
-    return [(stereo[i:i + 4800], 0.0, True, 0.0) for i in range(0, len(stereo) - 4800, 4800)]
+    return [stereo[i:i + 4800] for i in range(0, len(stereo) - 4800, 4800)]
 
 
 def analyse(level_db=-8, lr=(1.0, 1.0), fx=None, current=FLAT, secs=20, hiss=0.0):
@@ -21,7 +21,7 @@ def analyse(level_db=-8, lr=(1.0, 1.0), fx=None, current=FLAT, secs=20, hiss=0.0
         v = v + hiss * Pedalboard([HighpassFilter(cutoff_frequency_hz=9000)])(
             np.random.default_rng(1).standard_normal(len(v)).astype(np.float32)[None, :], RATE)[0]
     v = v / np.abs(v).max() * 10 ** (level_db / 20)
-    return mixer.analyse(blocks_of(np.stack([v * lr[0], v * lr[1]], axis=1)), [], -80.0, current)
+    return mixer.analyse(blocks_of(np.stack([v * lr[0], v * lr[1]], axis=1)), -80.0, current)
 
 
 def kinds(r):
@@ -34,7 +34,7 @@ def step(r, key):
 
 def test_silence_is_reported_as_no_signal():
     silent = np.zeros((RATE * 12, 2), np.float32)
-    r = mixer.analyse(blocks_of(silent), [], -90.0, FLAT)
+    r = mixer.analyse(blocks_of(silent), -90.0, FLAT)
     assert "Almost no signal" in r["error"]
 
 

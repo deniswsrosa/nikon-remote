@@ -217,11 +217,10 @@ def _distance_move(value: float, rng: tuple) -> dict | None:
     return None
 
 
-def analyse(blocks: list, silence: list, floor: float | None, current: dict) -> dict:
-    """blocks: [(stereo float32 100 ms, kweighted_ms, speaking, peak_db)] from the monitor."""
+def analyse(blocks: list, floor: float | None, current: dict) -> dict:
     if not blocks:
         raise ValueError("No audio captured")
-    stereo = np.concatenate([b[0] for b in blocks]).astype(np.float32)
+    stereo = np.concatenate(blocks).astype(np.float32)
     mono = stereo.mean(axis=1)
     mask = _speech_mask(mono)
     speech_secs = mask.sum() / RATE
