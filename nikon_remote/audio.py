@@ -73,7 +73,6 @@ class AudioMonitor:
         self._zi = None
         self._kblocks: deque = deque(maxlen=30)  # K-weighted mean-square per block, per channel (3 s)
         self._rms_hist: deque = deque(maxlen=300)  # block RMS dBFS, 30 s
-        self._silence: deque = deque(maxlen=50)  # raw mono blocks judged as silence (5 s)
         self._capture: list | None = None  # voice check buffer
         self._capture_blocks = 0  # how many 100 ms blocks the running voice check wants
         self._capture_future: Future | None = None
@@ -173,8 +172,6 @@ class AudioMonitor:
         self._rms_hist.append(rms)
         floor = float(np.percentile(self._rms_hist, 15)) if len(self._rms_hist) >= 30 else None
         speaking = rms > max((floor if floor is not None else -70) + 12, -55)
-        if not speaking:
-            self._silence.append(x.mean(axis=1))
         if peak > -1.0:
             self._clip_until = time.monotonic() + 3
         balance = db(float(rms_ch[0])) - db(float(rms_ch[1]))
@@ -215,7 +212,7 @@ class AudioMonitor:
 
         now = time.monotonic()
         if self._capture is not None:
-            self._capture.append((x.copy(), float(kb[-1].sum()), speaking, peak))
+            self._capture.append(x.copy())
             if len(self._capture) >= self._capture_blocks and self._capture_blocks:
                 self._finish_check()
 
@@ -259,7 +256,7 @@ class AudioMonitor:
 
         def work():
             try:
-                fut.set_result(mixer.analyse(blocks, list(self._silence), floor, state))
+                fut.set_result(mixer.analyse(blocks, floor, state))
             except Exception as e:  # surfaced to the UI
                 log.exception("voice analysis failed")
                 fut.set_exception(e)
