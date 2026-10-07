@@ -219,11 +219,7 @@ STATUS_CODES = {
     "meter": 0xD1B1,
     "lv_prohibit": 0xD1A4,
     "movie_prohibit": 0xD0A4,
-    "focal_length": 0x5008,
-    "focal_min": 0xD0E3,
-    "focal_max": 0xD0E4,
     "ac_power": 0xD101,
-    "af_lock": 0xD104,
 }
 
 MOVIE_PROHIBIT_BITS = {
