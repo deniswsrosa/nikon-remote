@@ -149,7 +149,6 @@ class CameraService:
             "connected": False,
             "message": "Looking for the camera…",
             "model": None,
-            "serial": None,
             "firmware": None,
             "lv": False,
             "lv_error": None,
@@ -295,7 +294,6 @@ class CameraService:
             connected=True,
             message=None,
             model=info.model,
-            serial=info.serial.lstrip("0"),
             firmware=info.version,
             pc_mode=False,
             recording=self.recording,
@@ -455,11 +453,7 @@ class CameraService:
             battery=vals.get("battery"),
             remaining_shots=vals.get("remaining_shots"),
             meter=vals.get("meter"),
-            focal_length=vals.get("focal_length"),
-            focal_min=vals.get("focal_min"),
-            focal_max=vals.get("focal_max"),
             ac_power=bool(vals.get("ac_power")),
-            af_lock=bool(vals.get("af_lock")),
             movie_prohibit=catalog.decode_bits(prohibit, catalog.MOVIE_PROHIBIT_BITS)
             if not self.recording
             else [],
